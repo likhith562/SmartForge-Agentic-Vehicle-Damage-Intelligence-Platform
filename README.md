@@ -1,9 +1,6 @@
 <div align="center">
 
-<img src="assets/architecture_diagram.png" alt="SmartForge Banner" width="100%">
-
-# 🚗 SmartForge
-### Agentic Vehicle Damage Intelligence Platform
+# 🚗 Agentic Vehicle Damage Intelligence Platform
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Directed%20Cyclic%20Graph-FF6B35?style=for-the-badge)](https://github.com/langchain-ai/langgraph)
