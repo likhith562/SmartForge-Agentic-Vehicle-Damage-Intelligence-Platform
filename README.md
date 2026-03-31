@@ -101,13 +101,13 @@ Intake Agent ──► Fraud Detection Layer (5-check) ──► Trust Score < 7
                         │  Health Monitor (retry loop)                     │
                         │  Verification Engine (Golden Frame crops)        │
                         └──────────────────────────────────────────────────┘
-                            │
-                            ▼
-                        Reasoning Engine ──► Decision Engine ──► Report Generator
-                        (severity + cost)    (score + ruling)    (Groq narrative)
-                            │
-                            ▼
-                        Final Output: Claim Decision + Cost Estimate
+                                                  │
+                                                  ▼
+                                          Reasoning Engine ──► Decision Engine ──► Report Generator
+                                          (severity + cost)    (score + ruling)    (Groq narrative)
+                                                  │
+                                                  ▼
+                                  Final Output: Claim Decision + Cost Estimate
 ```
 
 ---
