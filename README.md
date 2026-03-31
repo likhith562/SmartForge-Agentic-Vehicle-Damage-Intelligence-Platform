@@ -115,7 +115,7 @@ Intake Agent ──► Fraud Detection Layer (5-check) ──► Trust Score < 7
 ### Computer Vision Pipeline
 
 <div align="center">
-<img src="assets/diagrams/cv_pipeline.png" alt="Computer Vision & Damage Analysis Pipeline" width="420">
+<img src="assets/diagrams/cv_pipeline.png" alt="Computer Vision & Damage Analysis Pipeline" width="500">
 <br/>
 <em>Computer Vision & Damage Analysis Pipeline — YOLO → SAHI → SAM → MiDaS → Feature Extraction</em>
 </div>
