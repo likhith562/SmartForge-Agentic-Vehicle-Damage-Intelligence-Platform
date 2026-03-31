@@ -846,13 +846,6 @@ dnspython
 - [ ] **Unit test coverage** — complete `tests/` suite with CI/CD via GitHub Actions
 - [ ] **Docker** — containerised deployment with `docker-compose.yml`
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
----
 
 ## 🙏 Acknowledgements
 
