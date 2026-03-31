@@ -8,7 +8,6 @@
 [![Groq](https://img.shields.io/badge/Groq-Llama%203.3%2070b-F55036?style=for-the-badge)](https://groq.com)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com)
 [![Gradio](https://img.shields.io/badge/Gradio-5%20Tab%20Dashboard-FF7C00?style=for-the-badge&logo=gradio&logoColor=white)](https://gradio.app)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Open In Colab](https://img.shields.io/badge/Open%20In-Colab-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)](https://colab.research.google.com/)
 
 <br/>
