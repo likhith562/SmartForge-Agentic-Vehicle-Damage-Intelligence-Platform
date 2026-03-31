@@ -90,10 +90,12 @@ User Upload
     ▼
 Intake Agent ──► Fraud Detection Layer (5-check) ──► Trust Score < 70 ──► Human Audit System
                                                   │
-                                                  ▼ Trust Score ≥ 70 (PASS)
+                                                  |  Trust Score ≥ 70 (PASS)
+                                                  |
+                                                  ▼ 
                         ┌──────────────────────────────────────────────────┐
                         │              Agentic AI Core                     │
-                        │  Perception Engine (YOLO + SAHI + SAM + MiDaS) │
+                        │  Perception Engine (YOLO + SAHI + SAM + MiDaS)   │
                         │  Gemini Agent (multimodal validation)            │
                         │  False Positive Gate                             │
                         │  Health Monitor (retry loop)                     │
@@ -276,12 +278,12 @@ class SmartForgeState(TypedDict):
 ### Graph Topology
 
 ```
-intake ──► fraud ──┬──► map_images ──► cv_worker(×N) ──► fusion ──►┐
-                   │   [Batch 2 Send fan-out]                        │
-                   │                                                  ▼
-                   └────────────────────────────────────► perception
+intake ──► fraud ──┬──► map_images ──► cv_worker(×N) ──► fusion  ──►┐
+                   │   [Batch 2 Send fan-out]                       │
+                   │                                                ▼
+                   └──────────────────────────────────────►    perception
                                                                     │
-                                              human_audit ◄─SUSPICIOUS
+                                                 human_audit ◄─SUSPICIOUS
                                                                     │
                                                               gemini_agent
                                                                     │
@@ -553,7 +555,6 @@ smartforge-agentic-ai/
 │
 ├── .env.example                    # API key template (GROQ, GEMINI, MONGO_URI)
 ├── .gitignore                      # Excludes __pycache__, .env, uploaded images, *.pt models
-├── LICENSE                         # MIT License
 ├── README.md                       # This file
 ├── requirements.txt                # All Python dependencies with pinned versions
 ├── main.py                         # Entry point — launches both Gradio apps simultaneously
