@@ -75,7 +75,7 @@ SmartForge is built around four interconnected subsystems. All four are visualis
 The top-level architecture orchestrates all agents through a LangGraph state machine. Every node communicates exclusively through `SmartForgeState` — a typed dictionary that flows through the graph and accumulates results without mutation conflicts.
 
 <div align="center">
-<img src="assets/diagrams/system_architecture.png" alt="SmartForge System Architecture" width="500">
+<img src="assets/diagrams/system_architecture.png" alt="SmartForge System Architecture" width="100%">
 <br/>
 <em>SmartForge System Architecture — Full agentic pipeline from user upload to final claim decision</em>
 </div>
@@ -115,7 +115,7 @@ Intake Agent ──► Fraud Detection Layer (5-check) ──► Trust Score < 7
 ### Computer Vision Pipeline
 
 <div align="center">
-<img src="assets/diagrams/cv_pipeline.png" alt="Computer Vision & Damage Analysis Pipeline" width="500" height="750">
+<img src="assets/diagrams/cv_pipeline.png" alt="Computer Vision & Damage Analysis Pipeline" width="100%">
 <br/>
 <em>Computer Vision & Damage Analysis Pipeline — YOLO → SAHI → SAM → MiDaS → Feature Extraction</em>
 </div>
@@ -139,7 +139,7 @@ The perception engine runs four stacked models in sequence:
 ### Fraud Detection Layer
 
 <div align="center">
-<img src="assets/diagrams/fraud_layer.png" alt="SmartForge Fraud Detection Layer Flow" width="580">
+<img src="assets/diagrams/fraud_layer.png" alt="SmartForge Fraud Detection Layer Flow" width="100%">
 <br/>
 <em>Fraud Detection Layer — 5-check parallel pipeline computing a 0–100 Trust Score</em>
 </div>
@@ -169,7 +169,7 @@ Trust Score ≥ 70  →  VERIFIED              →  Perception Pipeline
 ### Agentic Decision & Reasoning Flow
 
 <div align="center">
-<img src="assets/diagrams/decision_flow.png" alt="SmartForge Agentic Decision & Reasoning Flow" width="380">
+<img src="assets/diagrams/decision_flow.png" alt="SmartForge Agentic Decision & Reasoning Flow" width="100%" >
 <br/>
 <em>Agentic Decision & Reasoning Flow — From CV candidate output to final claim ruling</em>
 </div>
