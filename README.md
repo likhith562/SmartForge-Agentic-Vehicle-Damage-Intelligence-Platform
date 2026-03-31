@@ -75,7 +75,7 @@ SmartForge is built around four interconnected subsystems. All four are visualis
 The top-level architecture orchestrates all agents through a LangGraph state machine. Every node communicates exclusively through `SmartForgeState` — a typed dictionary that flows through the graph and accumulates results without mutation conflicts.
 
 <div align="center">
-<img src="assets/diagrams/system_architecture.png" alt="SmartForge System Architecture" width="380">
+<img src="assets/diagrams/system_architecture.png" alt="SmartForge System Architecture" width="500">
 <br/>
 <em>SmartForge System Architecture — Full agentic pipeline from user upload to final claim decision</em>
 </div>
