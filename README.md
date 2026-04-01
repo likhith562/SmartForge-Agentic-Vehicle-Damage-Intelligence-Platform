@@ -665,23 +665,27 @@ cd smartforge-agentic-ai
 pip install -r requirements.txt
 ```
 
-### Model Downloads
+### Model Files
 
-SmartForge requires three pre-trained model files. Download and place them in the project root or set paths in `.env`:
+| File | Source | Purpose |
+|---|---|---|
+| `seg-best.pt` | ✅ Included — `models/seg-best.pt` | Custom YOLO damage segmentation |
+| `detect-best.pt` | ✅ Included — `models/detect-best.pt` | Custom YOLO part detection |
+| `sam_vit_b_01ec64.pth` | ⬇️ Auto-downloaded at runtime (~375 MB) | Meta SAM ViT-B segmentation |
+
+The two custom YOLO models ship with this repository inside the `models/` folder. Copy them to `/content/` before running Cell 1:
 
 ```bash
-# YOLOv8 damage segmentation model (custom-trained)
-# Place at: data/models/seg-best.pt
-
-# YOLOv8 part detection model (custom-trained)
-# Place at: data/models/detect-best.pt
-
-# SAM ViT-B checkpoint (~375 MB)
-wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth \
-     -O data/models/sam_vit_b_01ec64.pth
+# In Colab
+!cp models/seg-best.pt    /content/seg-best.pt
+!cp models/detect-best.pt /content/detect-best.pt
 ```
 
-> **Note:** The custom YOLO models (`seg-best.pt`, `detect-best.pt`) are not included in this repository. Contact the project maintainers for model access.
+The SAM checkpoint is fetched automatically from Meta's CDN on first run — no manual download required:
+
+```python
+SAM_URL = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+```
 
 ---
 
@@ -736,22 +740,37 @@ VEHICLE_VALUE=15000
 
 ### Option A — Google Colab (Recommended)
 
-1. Open `notebooks/Vehicle_Damage_Agentic_AI_v31.ipynb` in Google Colab
-2. Set Runtime → T4 GPU
-3. Add secrets in the Colab sidebar: `Gemini_API_Key`, `GROQ_API_KEY`, `SMARTFORGE_MONGO_URI`
-4. Run cells in order:
+1. Open `notebooks/Vehicle_Damage_Agentic_AI_v36_fixed.ipynb` in Google Colab
+2. Set **Runtime → Change runtime type → T4 GPU**
+3. Add secrets via the **🔑 Key icon** in the left sidebar (toggle **Notebook access ON** for each):
+
+   | Secret Name | Where to get it |
+   |---|---|
+   | `GEMINI_API_KEY` | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
+   | `GROQ_API_KEY` | [console.groq.com/keys](https://console.groq.com/keys) |
+   | `SMARTFORGE_MONGO_URI` | MongoDB Atlas connection string *(optional — SQLite fallback applies if omitted)* |
+
+4. Copy the custom model weights from the repo's `models/` folder into Colab's working directory:
+   ```python
+   # Run this once before Cell 1 — or mount Drive and adjust paths there
+   !cp models/seg-best.pt    /content/seg-best.pt
+   !cp models/detect-best.pt /content/detect-best.pt
    ```
-   Cell 0   → Drive mount (optional)
-   Cell 1   → Configuration (edit API keys + thresholds)
-   Cell 2   → Install dependencies (~3–5 minutes)
-   Cell 3   → Imports & environment check
+   > **SAM weights** (`sam_vit_b_01ec64.pth`, ~375 MB) are downloaded **automatically** from Meta's servers on first run — no action needed.
+
+5. Run cells in order:
+   ```
+   Cell 0   → Drive mount (optional — useful for persisting model files)
+   Cell 1   → Configuration (verify model paths + thresholds)
+   Cell 2   → Install dependencies (~3–5 minutes first run)
+   Cell 3   → Imports & environment check (confirms GPU)
    Cells 4–13 → Pipeline nodes (intake, fraud, perception, agents, graph)
-   Cell G1  → Dashboard config (MONGO_URI, theme, share)
+   Cell G1  → Dashboard config (MONGO_URI, theme, share toggle)
    Cell G2  → Database layer (MongoDB/SQLite auto-select)
-   Cell G3  → User Dashboard (builds user_demo)
+   Cell G3  → User Dashboard (builds user_demo — does not launch yet)
    Cell G4  → Auditor Dashboard + launches both apps
    ```
-5. Two public share links appear — one for users, one for auditors
+6. Two public share links appear in Cell G4 output — one for users (port 7860), one for auditors (port 7861)
 
 ### Option B — Local Launch
 
