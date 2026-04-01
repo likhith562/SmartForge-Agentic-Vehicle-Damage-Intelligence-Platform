@@ -39,8 +39,8 @@ SmartForge is a fully agentic, end-to-end insurance claims processing pipeline b
 ## Architecture
 
 ```
-intake ──► fraud ──┬──► map_images ──► cv_worker(×N) ──► fusion ──►┐
-(single-image)     │   (multi-image Send fan-out)                   │
+intake ──► fraud ──┬──► map_images ──► cv_worker(×N) ──► fusion   ──►┐
+(single-image)     │   (multi-image Send fan-out)                    │
                    │                                                 ▼
                    └──────────────────────────────────────► perception
                                                                      │
@@ -52,7 +52,7 @@ intake ──► fraud ──┬──► map_images ──► cv_worker(×N) �
                                                            ┌─────────┘
                                                     (retry?│circuit breaker)
                                                            ▼
-                                                  verification_v2_node  ← Batch 3 Golden Frame
+                                                  verification_v2_node  ←  Golden Frame
                                                            │
                                                      reasoning_node     ← cost estimation
                                                            │
@@ -61,7 +61,7 @@ intake ──► fraud ──┬──► map_images ──► cv_worker(×N) �
                                                            │
                                                       report_node       ← Groq narratives
                                                            │
-                                                         END
+                                                          END
 ```
 
 **Key design patterns:**
