@@ -1,0 +1,45 @@
+{
+  "job_id": "VH001-IMG001-20260329T041500",
+  "status": "HUMAN_AUDIT_REQUIRED",
+  "fraud_report": {
+    "trust_score": 0,
+    "status": "SUSPICIOUS_HIGH_RISK",
+    "flags": [
+      "NO_EXIF_DATETIME \u2014 cannot verify photo age",
+      "NO_EXIF_GPS \u2014 possible stock/internet image",
+      "RECYCLED_IMAGE: pHash match (Hamming=0) against prior claim '/content/car_1_normal_resized.jpg'. \u221240pts",
+      "SCREEN_CAPTURE: FFT/colour analysis detected photo-of-a-screen (confidence=0.50). Signals: ['FFT_MOIRE: mid-freq energy ratio=0.535 > 0.38']. \u221235pts"
+    ],
+    "details": {
+      "exif_software": "None",
+      "source_type": "original_mobile_capture",
+      "phash_check": {
+        "status": "DUPLICATE_DETECTED",
+        "phash": "c8d12bbdb496b268",
+        "matched_claim": "/content/car_1_normal_resized.jpg",
+        "hamming_distance": 0
+      },
+      "screen_detection": {
+        "is_screen": true,
+        "confidence": 0.5,
+        "signals": [
+          "FFT_MOIRE: mid-freq energy ratio=0.535 > 0.38"
+        ]
+      },
+      "ai_generation_check": {
+        "is_ai_generated": false,
+        "ai_probability": 0.063,
+        "ela_score": 1.252,
+        "method": "ela_forensics",
+        "stages_run": [
+          "ela_forensics"
+        ],
+        "reasoning": "ELA score 1.25 \u2264 5.0 \u2014 consistent compression (no editing artefacts)"
+      }
+    },
+    "next_node": "human_audit",
+    "checked_at": "2026-03-29T04:15:02.646019+00:00",
+    "checks_run": 5
+  },
+  "message": "Claim flagged by Batch 1 Fraud Layer (5-check). Human review required."
+}

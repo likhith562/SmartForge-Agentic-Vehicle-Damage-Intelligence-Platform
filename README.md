@@ -575,11 +575,13 @@ smartforge-agentic-ai/
 │
 ├── data/
 │   ├── sample_images/
-│   │   ├── car_clean.jpg                # No-damage test image
+│   │   ├── bike_clean.jpg                # No-damage test image
 │   │   ├── car_damaged_front.jpg        # Front bumper damage
 │   │   └── car_fraud_screenshot.jpg     # Screen-capture fraud test
-│   ├── fraud_hash_db.json               # Local pHash fraud database (seed entries)
-│   └── mock_checkpoints.json            # For auditor timeline testing without DB
+│   ├── checkpoint_dump.json            # For auditor timeline testing without DB
+|   ├── final_output.json               
+|   ├── fraud_audit_report.json
+│   └── fraud_hash_db.json               # Local pHash fraud database (seed entries)
 │
 ├── notebooks/
 │   ├── Vehicle_Damage_Agentic_AI_v31.ipynb  # Latest monolithic Colab notebook
