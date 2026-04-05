@@ -1,15 +1,8 @@
 """
-src.config
-----------
-Loads environment variables and exposes validated settings to the rest of
-the application.  Import from here — never import settings.py directly.
-
-Usage
------
-    from src.config import settings
-    print(settings.GEMINI_MODEL)
+SmartForge config sub-package.
+Exports the fully-resolved Settings singleton.
 """
 
-from src.config import settings  # noqa: F401  (re-export for convenience)
+from .settings import Settings
 
-__all__ = ["settings"]
+__all__ = ["Settings"]

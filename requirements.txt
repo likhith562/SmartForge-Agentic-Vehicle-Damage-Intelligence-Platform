@@ -1,55 +1,40 @@
-# SmartForge — Python dependencies
-# Install: pip install -r requirements.txt
-#
-# GPU note: torch/torchvision install the CPU build by default.
-# For CUDA support, replace the torch lines with:
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-# ──────────────────────────────────────────────────────────────────────────────
-
 # ── LangGraph orchestration ───────────────────────────────────────────────────
-langgraph>=0.2.0
-langchain-core>=0.3.0
+langgraph>=0.2
+langchain-core>=0.3
 
-# ── Computer vision stack ─────────────────────────────────────────────────────
-ultralytics>=8.2.0          # YOLOv8 / YOLOv11 segmentation + detection
-sahi>=0.11.19               # Sliced-inference for small-object detection
-timm>=1.0.0                 # TIMM model zoo (depth estimation backbone)
-opencv-python>=4.9.0.80
-matplotlib>=3.9.0
+# ── Computer Vision stack ─────────────────────────────────────────────────────
+ultralytics>=8.0
+sahi>=0.11
+timm
+torch>=2.0
+torchvision
+opencv-python
+Pillow
+numpy
+matplotlib
 
-# ── PyTorch (CPU default — see GPU note above) ─────────────────────────────────
-torch>=2.3.0
-torchvision>=0.18.0
-
-# ── Segment Anything Model (SAM) — install from GitHub ───────────────────────
-# git+https://github.com/facebookresearch/segment-anything.git
-# Uncomment the line above OR run separately:
+# ── Segment Anything Model (Meta) ─────────────────────────────────────────────
+# Install separately after pip install -r requirements.txt:
 #   pip install git+https://github.com/facebookresearch/segment-anything.git
+# segment-anything
 
-# ── LLM API clients ───────────────────────────────────────────────────────────
-groq>=0.9.0                 # Groq API — fast LLM inference for report generation
-google-generativeai>=0.8.0  # Gemini SDK (legacy compat layer)
-google-genai>=1.0.0         # Gemini new SDK (replaces deprecated genai)
+# ── AI API clients ────────────────────────────────────────────────────────────
+groq
+google-genai
+google-generativeai
 
-# ── Fraud detection ───────────────────────────────────────────────────────────
-exifread>=3.0.0             # EXIF metadata extraction
-imagehash>=4.3.1            # Perceptual hashing for duplicate/fraud detection
-requests>=2.32.0            # SerpAPI + Winston AI HTTP calls
-Pillow>=10.3.0              # Image loading for pHash
+# ── Fraud detection utilities ─────────────────────────────────────────────────
+exifread          # EXIF metadata extraction (Batch 1 Fraud Layer)
+imagehash         # Perceptual hashing for reverse-image check
+requests          # SerpAPI / Winston AI HTTP calls
 
-# ── Graph database (Batch 2 multi-image fusion) ───────────────────────────────
-networkx>=3.3.0
+# ── Graph database ────────────────────────────────────────────────────────────
+networkx          # In-memory Graph DB for Batch 2 multi-image fusion
 
 # ── Database ──────────────────────────────────────────────────────────────────
-pymongo>=4.7.0              # MongoDB Atlas driver
-dnspython>=2.6.0            # Required for MongoDB Atlas SRV DNS lookups
-# sqlite3 ships with Python — no install needed
+pymongo           # MongoDB driver (primary DB backend)
+dnspython         # Required for MongoDB Atlas SRV DNS lookups
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-gradio>=5.0.0               # Dual Gradio dashboards (User + Auditor)
-
-# ── Data utilities ────────────────────────────────────────────────────────────
-pandas>=2.2.0               # DataFrame support for financial tables
-
-# ── Config / environment ──────────────────────────────────────────────────────
-python-dotenv>=1.0.0        # Loads .env file for local development
+gradio>=4.44.0
+pandas            # DataFrame support for financial tables

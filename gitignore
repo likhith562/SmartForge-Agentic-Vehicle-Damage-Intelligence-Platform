@@ -1,0 +1,91 @@
+# ── Secrets & environment ─────────────────────────────────────────────────────
+.env
+*.env.local
+*.env.*.local
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+*.whl
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Model weights (large binary files) ───────────────────────────────────────
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+# Exception: keep the README placeholder files
+!data/models/.gitkeep
+
+# ── Uploaded / generated images ───────────────────────────────────────────────
+/content/
+data/uploads/
+golden_crops/
+*.jpg
+*.jpeg
+*.png
+*.webp
+# Exception: keep sample images committed for docs
+!data/sample_images/**
+
+# ── SQLite database ───────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Local fraud hash database (auto-generated at runtime) ────────────────────
+fraud_hash_db.json
+
+# ── Pipeline output artefacts ─────────────────────────────────────────────────
+audit_log.json
+escalation_record.json
+checkpoint_dump.json
+final_output.json
+fraud_audit_report.json
+
+# ── Jupyter / Colab ───────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Node / npm (Gradio dev tooling) ───────────────────────────────────────────
+node_modules/
+package-lock.json
+yarn.lock
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.tar
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/

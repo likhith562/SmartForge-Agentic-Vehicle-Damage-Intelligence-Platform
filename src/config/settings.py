@@ -1,132 +1,48 @@
 """
-src/config/settings.py
-======================
-Central configuration for SmartForge.
+SmartForge — Configuration & Constants
+=======================================
+Single source of truth for every threshold, path, and API parameter used
+across the pipeline.  All values can be overridden via environment variables
+or a .env file (loaded automatically when python-dotenv is installed).
 
-Priority order (highest → lowest):
-  1. Real environment variables  (export SMARTFORGE_MONGO_URI=...)
-  2. .env file in project root   (loaded via python-dotenv if installed)
-  3. Hard-coded defaults below
-
-Never commit real API keys.  Use .env (git-ignored) or your OS key-store.
+Usage:
+    from src.config import Settings
+    cfg = Settings()
+    print(cfg.SAHI_CONFIDENCE)
 """
 
-from __future__ import annotations
-
 import os
-from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Dict, Any
 
-# ── Optional: load .env file ───────────────────────────────────────────────────
+
+# ── Optional dotenv support ───────────────────────────────────────────────────
 try:
     from dotenv import load_dotenv
-    load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
+    load_dotenv()
 except ImportError:
-    pass   # python-dotenv not installed — environment variables must be set manually
+    pass  # python-dotenv not installed — rely on os.environ directly
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 1. MODEL WEIGHTS  (set these to your actual file paths)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-DAMAGE_MODEL_PATH = os.getenv("DAMAGE_MODEL_PATH", "models/seg-best.pt")
-PART_MODEL_PATH   = os.getenv("PART_MODEL_PATH",   "models/detect-best.pt")
-
-# SAM (Segment Anything) — downloaded automatically on first run if missing
-SAM_CHECKPOINT = os.getenv("SAM_CHECKPOINT", "models/sam_vit_b_01ec64.pth")
-SAM_URL        = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 2. API KEYS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# ── Gemini VLM ─────────────────────────────────────────────────────────────────
-# Free key: https://aistudio.google.com/app/apikey
-GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL      = "gemini-2.5-flash"       # primary (multimodal, free tier)
-GEMINI_FALLBACK   = "gemini-2.5-flash-lite"  # auto-fallback on HTTP 429
-GEMINI_ENABLED    = bool(GEMINI_API_KEY)
-
-# ── Groq (report generation — fast inference) ──────────────────────────────────
-# Free key: https://console.groq.com
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL   = "llama-3.3-70b-versatile"
-GROQ_ENABLED = bool(GROQ_API_KEY)
-
-# ── SerpAPI (reverse image search) ────────────────────────────────────────────
-# 100 free searches/month: https://serpapi.com
-SERPAPI_KEY     = os.getenv("SERPAPI_KEY", "")
-SERPAPI_ENABLED = bool(SERPAPI_KEY)
-
-# ── Winston AI (AI-generation detection) ──────────────────────────────────────
-# 2 000 free credits/month: https://app.gowinston.ai
-WINSTON_AI_KEY     = os.getenv("WINSTON_AI_KEY", "")
-WINSTON_AI_ENABLED = bool(WINSTON_AI_KEY)
-WINSTON_AI_THRESHOLD = 0.70   # AI-probability above this → flagged
+def _env(key: str, default):
+    """Read an env-var and cast to the same type as *default*."""
+    val = os.environ.get(key)
+    if val is None:
+        return default
+    if isinstance(default, bool):
+        return val.lower() in ("1", "true", "yes")
+    if isinstance(default, float):
+        return float(val)
+    if isinstance(default, int):
+        return int(val)
+    return val
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 3. DATABASE
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# MongoDB Atlas URI — leave empty to fall back to local SQLite automatically.
-# Atlas free tier: https://mongodb.com/atlas
-# Format: "mongodb+srv://<user>:<password>@<cluster>.mongodb.net/"
-MONGO_URI   = os.getenv("SMARTFORGE_MONGO_URI", "")
-SQLITE_PATH = os.getenv("SQLITE_PATH", "data/smartforge_claims.db")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 4. COMPUTER VISION / SAHI
-# ═══════════════════════════════════════════════════════════════════════════════
-
-SAHI_CONFIDENCE = float(os.getenv("SAHI_CONFIDENCE", "0.3"))
-SAHI_SLICE_SIZE = int(os.getenv("SAHI_SLICE_SIZE",   "640"))
-SAHI_OVERLAP    = float(os.getenv("SAHI_OVERLAP",    "0.2"))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 5. AGENTIC THRESHOLDS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-MAX_RETRIES              = int(float(os.getenv("MAX_RETRIES",              "2")))
-ESCALATION_THRESHOLD     = int(float(os.getenv("ESCALATION_THRESHOLD",     "70")))
-CONFIDENCE_RECHECK_LIMIT = float(os.getenv("CONFIDENCE_RECHECK_LIMIT",    "0.45"))
-AUTO_APPROVE_THRESHOLD   = int(float(os.getenv("AUTO_APPROVE_THRESHOLD",   "85")))
-HEALTH_SCORE_MIN         = float(os.getenv("HEALTH_SCORE_MIN",            "0.6"))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 6. FRAUD DETECTION LAYER (Batch 1)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-FRAUD_TRUST_THRESHOLD      = int(float(os.getenv("FRAUD_TRUST_THRESHOLD",     "40")))
-FRAUD_GPS_MAX_DISTANCE_KM  = float(os.getenv("FRAUD_GPS_MAX_DISTANCE_KM",    "50.0"))
-PHASH_HAMMING_THRESHOLD    = int(float(os.getenv("PHASH_HAMMING_THRESHOLD",   "8")))
-FRAUD_HASH_DB_PATH         = os.getenv("FRAUD_HASH_DB_PATH", "data/fraud_hash_db.json")
-MAX_FRAUD_RETRIES          = int(float(os.getenv("MAX_FRAUD_RETRIES",         "3")))
-
-# Set BYPASS_FRAUD=true to skip all fraud checks in demo/dev mode
-BYPASS_FRAUD = os.getenv("BYPASS_FRAUD", "false").lower() in ("1", "true", "yes")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 7. GOLDEN FRAME VERIFICATION (Batch 3)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-GOLDEN_FRAME_CROP_MARGIN    = float(os.getenv("GOLDEN_FRAME_CROP_MARGIN",    "0.25"))
-GOLDEN_FRAME_MIN_CROP_PX    = int(float(os.getenv("GOLDEN_FRAME_MIN_CROP_PX","128")))
-GOLDEN_FRAME_CONFIDENCE_MIN = float(os.getenv("GOLDEN_FRAME_CONFIDENCE_MIN","0.55"))
-GOLDEN_FRAME_CROP_DIR       = os.getenv("GOLDEN_FRAME_CROP_DIR", "data/golden_crops")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 8. FINANCIAL INTELLIGENCE (Batch 4)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Simulates a Mitchell/Audatex industry-grade parts & labour database.
+# ── Repair / Replace cost database ───────────────────────────────────────────
+# Simulates a Mitchell / Audatex industry-grade parts & labour database.
 # Format: part_name → {replace: USD, paint: USD, labor_per_hour: USD}
-REPAIR_DATABASE: dict[str, dict[str, float]] = {
+# Costs are in USD; converted to INR for display using USD_TO_INR.
+REPAIR_DATABASE: Dict[str, Dict[str, float]] = {
     "Front Bumper":       {"replace": 450,  "paint": 200,  "labor_per_hour": 85},
     "Rear Bumper":        {"replace": 420,  "paint": 175,  "labor_per_hour": 85},
     "Side Bumper":        {"replace": 320,  "paint": 140,  "labor_per_hour": 80},
@@ -142,116 +58,233 @@ REPAIR_DATABASE: dict[str, dict[str, float]] = {
     "_default":           {"replace": 500,  "paint": 150,  "labor_per_hour": 80},
 }
 
-# Severity → recommended repair action
-SEVERITY_TO_ACTION: dict[str, str] = {
+# Severity → repair action mapping
+# Minor / Moderate → cosmetic repair/repaint
+# Severe / Critical → full part replacement
+SEVERITY_TO_ACTION: Dict[str, str] = {
     "Minor":    "REPAIR/PAINT",
     "Moderate": "REPAIR/PAINT",
     "Severe":   "REPLACE",
     "Critical": "REPLACE",
 }
 
-VEHICLE_VALUE        = float(os.getenv("VEHICLE_VALUE",        "15000"))  # USD default
-TOTAL_LOSS_THRESHOLD = float(os.getenv("TOTAL_LOSS_THRESHOLD", "0.75"))   # >75% → TOTALED
-USD_TO_INR           = float(os.getenv("USD_TO_INR",           "83"))     # display conversion
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 9. GRADIO / UI
-# ═══════════════════════════════════════════════════════════════════════════════
-
-GRADIO_SHARE       = os.getenv("GRADIO_SHARE", "true").lower() in ("1", "true", "yes")
-GRADIO_DEBUG       = os.getenv("GRADIO_DEBUG", "false").lower() in ("1", "true", "yes")
-GRADIO_THEME       = os.getenv("GRADIO_THEME", "dark")
-GRADIO_VERSION_TAG = "v36"
-USER_PORT          = int(os.getenv("USER_PORT",    "7860"))
-AUDITOR_PORT       = int(os.getenv("AUDITOR_PORT", "7861"))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 10. SYSTEM PROMPTS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-SYSTEM_PROMPTS: dict[str, str] = {
-
-    # ── Gemini: vehicle classification + damage discovery (Task 1 & 4) ─────────
-    "gemini_intake": (
-        "You are a vehicle forensics AI embedded inside an autonomous insurance "
-        "claims pipeline. Your job is to analyse a photograph of a vehicle and "
-        "return a structured JSON response — no markdown, no prose, JSON only.\n\n"
-        "Required fields:\n"
-        "  vehicle_type        : 'car' | '2W' | '3W' | 'unknown'\n"
-        "  vehicle_type_confidence : float 0.0–1.0\n"
-        "  vehicle_make_estimate   : e.g. 'sedan-class', 'hatchback', 'SUV'\n"
-        "  discovered_damages  : list of {type, location, severity, confidence}\n\n"
-        "Damage types: Scratch | Dent | Cracked | Broken part | Missing part | "
-        "Paint chip | Flaking | Corrosion\n"
-        "Severity:     Minor | Moderate | Severe | Critical\n"
-        "Confidence:   0.0–1.0"
-    ),
-
-    # ── Gemini: Golden Frame deep-look per crop (Batch 3) ──────────────────────
-    "gemini_golden_frame": (
-        "You are a precision vehicle damage verification AI. "
-        "You are given a tightly cropped image of one specific damage region "
-        "detected by a computer-vision model.\n\n"
-        "Verify whether the damage is genuine and return JSON only:\n"
-        "  confirmed      : true | false\n"
-        "  damage_type    : string (from the standard taxonomy)\n"
-        "  severity       : Minor | Moderate | Severe | Critical\n"
-        "  confidence     : float 0.0–1.0\n"
-        "  reasoning      : one sentence\n\n"
-        "Be conservative — if the crop is ambiguous, set confirmed=false."
-    ),
-
-    # ── Groq: full claim report generation ─────────────────────────────────────
-    "groq_report": (
-        "You are SmartForge Report Writer, an expert insurance claims analyst AI. "
-        "You receive a structured JSON object containing all pipeline outputs "
-        "for a vehicle damage claim and must produce a professional, concise "
-        "insurance adjuster report.\n\n"
-        "Format rules:\n"
-        "- Plain text only — no markdown, no bullets, no headers.\n"
-        "- Three paragraphs maximum.\n"
-        "- Para 1: vehicle & incident summary.\n"
-        "- Para 2: damage findings, severity, and financial estimate.\n"
-        "- Para 3: recommendation (Approve / Reject / Escalate) and justification."
-    ),
-
-    # ── Groq: conversational chat assistant (User Dashboard Tab 5) ─────────────
-    "groq_chat": (
-        "You are the SmartForge Claims Assistant, a helpful, professional AI "
-        "embedded in an insurance claims portal. You have access to this user's "
-        "claim analysis results (provided in the first message). "
-        "Answer questions clearly and concisely. "
-        "Never fabricate figures not present in the provided data. "
-        "If unsure, say so and suggest the user contact their insurer."
-    ),
+# Part name normalisation map (YOLO class names → human-readable)
+PART_NAME_MAP: Dict[str, str] = {
+    "BUMPER--F":    "Front Bumper",
+    "BUMPER--R":    "Rear Bumper",
+    "BUMPER--S":    "Side Bumper",
+    "DOOR":         "Door Panel",
+    "HOOD":         "Engine Hood",
+    "BOOT":         "Rear Boot",
+    "HEADLIGHT--L": "Left Headlight",
+    "HEADLIGHT--R": "Right Headlight",
+    "MIRROR":       "Side Mirror",
 }
 
+# Spatial zone → natural language descriptions (used when part model misses)
+ZONE_LANGUAGE_MAP: Dict[str, str] = {
+    "Front Center Upper Section":  "at the top of the front fascia",
+    "Front Center Main Body":      "across the front centre panel",
+    "Front Center Lower Section":  "near the front lower grille area",
+    "Front Left Upper Section":    "at the upper front-left corner",
+    "Front Left Main Body":        "on the front-left body panel",
+    "Front Left Lower Section":    "near the front-left wheel area",
+    "Front Right Upper Section":   "at the upper front-right corner",
+    "Front Right Main Body":       "on the front-right body panel",
+    "Front Right Lower Section":   "near the front-right wheel area",
+    "Middle Left Main Body":       "on the left side panel",
+    "Middle Right Main Body":      "on the right side panel",
+    "Rear Center Main Body":       "across the rear centre panel",
+    "Rear Left Main Body":         "on the rear-left body panel",
+    "Rear Right Main Body":        "on the rear-right body panel",
+    "Rear Center Lower Section":   "near the rear lower bumper area",
+}
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 11. QUICK SANITY CHECK (run: python -m src.config.settings)
-# ═══════════════════════════════════════════════════════════════════════════════
+# Severity → cost table (INR ranges, used for quick estimates pre-financial engine)
+COST_TABLE: Dict[tuple, tuple] = {
+    ("Scratch",      "Low"):    ("₹500–₹1,500",    "Polish & touch-up"),
+    ("Scratch",      "Medium"): ("₹1,500–₹4,000",  "Repaint panel section"),
+    ("Scratch",      "High"):   ("₹4,000–₹8,000",  "Full panel repaint"),
+    ("Dent",         "Low"):    ("₹1,000–₹3,000",  "Paintless dent removal"),
+    ("Dent",         "Medium"): ("₹3,000–₹7,000",  "Panel beating + repaint"),
+    ("Dent",         "High"):   ("₹7,000–₹18,000", "Panel replacement"),
+    ("Cracked",      "High"):   ("₹8,000–₹25,000", "Part replacement"),
+    ("Broken part",  "High"):   ("₹5,000–₹40,000", "Component replacement"),
+    ("Missing part", "High"):   ("₹5,000–₹40,000", "Component replacement"),
+    ("Paint chip",   "Low"):    ("₹300–₹800",       "Spot touch-up"),
+    ("Paint chip",   "Medium"): ("₹800–₹2,500",     "Spot repaint"),
+    ("Flaking",      "Medium"): ("₹2,000–₹6,000",  "Strip & repaint"),
+    ("Corrosion",    "Medium"): ("₹3,000–₹9,000",  "Rust treatment + repaint"),
+    ("Corrosion",    "High"):   ("₹9,000–₹25,000", "Panel replacement"),
+}
+DEFAULT_COST: tuple = ("₹1,000–₹5,000", "Inspect and repair")
 
-if __name__ == "__main__":
-    import textwrap
 
-    print("\n" + "═" * 60)
-    print("  SmartForge Settings — environment check")
-    print("═" * 60)
+@dataclass
+class Settings:
+    """
+    Fully-resolved configuration object.  Reads from environment variables
+    first, then falls back to the defaults defined below.
 
-    checks = [
-        ("GEMINI_API_KEY",   GEMINI_ENABLED,    "gemini enabled"),
-        ("GROQ_API_KEY",     GROQ_ENABLED,      "groq enabled"),
-        ("SERPAPI_KEY",      SERPAPI_ENABLED,   "serpapi enabled"),
-        ("WINSTON_AI_KEY",   WINSTON_AI_ENABLED,"winston ai enabled"),
-        ("MONGO_URI",        bool(MONGO_URI),   "mongodb configured"),
-        ("DAMAGE_MODEL",     True,              DAMAGE_MODEL_PATH),
-        ("PART_MODEL",       True,              PART_MODEL_PATH),
-    ]
+    Instantiate once at app startup and pass around:
+        cfg = Settings()
+    """
 
-    for label, flag, detail in checks:
-        icon = "✅" if flag else "⚠️ "
-        print(f"  {icon}  {label:<22} {detail}")
+    # ── Model paths ──────────────────────────────────────────────────────────
+    DAMAGE_MODEL_PATH: str = field(
+        default_factory=lambda: _env("DAMAGE_MODEL_PATH", "/content/seg-best.pt"))
+    PART_MODEL_PATH: str = field(
+        default_factory=lambda: _env("PART_MODEL_PATH", "/content/detect-best.pt"))
+    SAM_CHECKPOINT: str = field(
+        default_factory=lambda: _env("SAM_CHECKPOINT", "/content/sam_vit_b_01ec64.pth"))
+    SAM_URL: str = (
+        "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+    )
 
-    print("═" * 60 + "\n")
+    # ── API keys ─────────────────────────────────────────────────────────────
+    GEMINI_API_KEY: str = field(
+        default_factory=lambda: _env("GEMINI_API_KEY", ""))
+    GROQ_API_KEY: str = field(
+        default_factory=lambda: _env("GROQ_API_KEY", ""))
+    SERPAPI_KEY: str = field(
+        default_factory=lambda: _env("SERPAPI_KEY", ""))
+    WINSTON_AI_KEY: str = field(
+        default_factory=lambda: _env("WINSTON_AI_KEY", ""))
+
+    # ── Database ─────────────────────────────────────────────────────────────
+    MONGO_URI: str = field(
+        default_factory=lambda: _env("SMARTFORGE_MONGO_URI", ""))
+    SQLITE_PATH: str = "/content/smartforge_claims.db"
+
+    # ── Gemini / Groq models ──────────────────────────────────────────────────
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_FALLBACK_MODEL: str = "gemini-2.5-flash-lite"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
+    # ── SAHI / perception ────────────────────────────────────────────────────
+    SAHI_CONFIDENCE: float = field(
+        default_factory=lambda: _env("SAHI_CONFIDENCE", 0.3))
+    SAHI_SLICE_SIZE: int = field(
+        default_factory=lambda: _env("SAHI_SLICE_SIZE", 640))
+    SAHI_OVERLAP: float = field(
+        default_factory=lambda: _env("SAHI_OVERLAP", 0.2))
+    CONFIDENCE_RECHECK_LIMIT: float = 0.45
+
+    # ── Agentic pipeline thresholds ──────────────────────────────────────────
+    MAX_RETRIES: int = field(
+        default_factory=lambda: _env("MAX_RETRIES", 2))
+    AUTO_APPROVE_THRESHOLD: int = field(
+        default_factory=lambda: _env("AUTO_APPROVE_THRESHOLD", 85))
+    ESCALATION_THRESHOLD: int = field(
+        default_factory=lambda: _env("ESCALATION_THRESHOLD", 70))
+    HEALTH_SCORE_MIN: float = 0.6
+
+    # ── Fraud layer ───────────────────────────────────────────────────────────
+    BYPASS_FRAUD: bool = field(
+        default_factory=lambda: _env("BYPASS_FRAUD", True))
+    MAX_FRAUD_RETRIES: int = field(
+        default_factory=lambda: _env("MAX_FRAUD_RETRIES", 3))
+    FRAUD_TRUST_THRESHOLD: int = field(
+        default_factory=lambda: _env("FRAUD_TRUST_THRESHOLD", 40))
+    FRAUD_GPS_MAX_DISTANCE_KM: float = field(
+        default_factory=lambda: _env("FRAUD_GPS_MAX_DISTANCE_KM", 50.0))
+    PHASH_HAMMING_THRESHOLD: int = field(
+        default_factory=lambda: _env("PHASH_HAMMING_THRESHOLD", 8))
+    WINSTON_AI_THRESHOLD: float = field(
+        default_factory=lambda: _env("WINSTON_AI_THRESHOLD", 0.70))
+    FRAUD_HASH_DB_PATH: str = field(
+        default_factory=lambda: _env("FRAUD_HASH_DB_PATH", "/content/fraud_hash_db.json"))
+
+    # ── Financial intelligence ────────────────────────────────────────────────
+    VEHICLE_VALUE: float = field(
+        default_factory=lambda: _env("VEHICLE_VALUE", 15000.0))
+    TOTAL_LOSS_THRESHOLD: float = field(
+        default_factory=lambda: _env("TOTAL_LOSS_THRESHOLD", 0.75))
+    USD_TO_INR: float = field(
+        default_factory=lambda: _env("USD_TO_INR", 83.0))
+
+    # ── Golden Frame Verification (Batch 3) ───────────────────────────────────
+    GOLDEN_FRAME_CROP_MARGIN: float = field(
+        default_factory=lambda: _env("GOLDEN_FRAME_CROP_MARGIN", 0.25))
+    GOLDEN_FRAME_MIN_CROP_PX: int = field(
+        default_factory=lambda: _env("GOLDEN_FRAME_MIN_CROP_PX", 128))
+    GOLDEN_FRAME_CONFIDENCE_MIN: float = field(
+        default_factory=lambda: _env("GOLDEN_FRAME_CONFIDENCE_MIN", 0.55))
+    GOLDEN_FRAME_CROP_DIR: str = field(
+        default_factory=lambda: _env("GOLDEN_FRAME_CROP_DIR", "/content/golden_crops"))
+
+    # ── False Positive Gate thresholds ────────────────────────────────────────
+    NON_CAR_CONF_THRESHOLD: float = 0.60
+    MIN_AREA_NON_CAR: float = 0.003
+    MIN_DEFORMATION_GATE: float = 0.001
+    FLAT_AREA_GATE: float = 0.005
+
+    # ── Output paths ─────────────────────────────────────────────────────────
+    AUDIT_LOG_PATH: str = "/content/audit_log.json"
+    ESCALATION_PATH: str = "/content/escalation_record.json"
+    CHECKPOINT_DUMP_PATH: str = "/content/checkpoint_dump.json"
+
+    # ── Gradio UI ─────────────────────────────────────────────────────────────
+    GRADIO_APP_TITLE: str = "🚗 SmartForge — Agentic Vehicle Damage Intelligence"
+    GRADIO_APP_SUBTITLE: str = "Autonomous Insurance Claims · LangGraph + Gemini VLM + Groq"
+    GRADIO_VERSION_TAG: str = "v1.0"
+    GRADIO_THEME: str = "soft"
+    GRADIO_SHARE: bool = True
+    GRADIO_DEBUG: bool = False
+
+    # ── Claim metadata (runtime defaults — overridden per-claim via UI) ───────
+    CLAIM_ACCIDENT_DATE: str = ""
+    CLAIM_LOSS_LOCATION_LAT: float = 0.0
+    CLAIM_LOSS_LOCATION_LON: float = 0.0
+    VEHICLE_ID: str = ""
+    IMAGE_ID: str = ""
+    POLICY_ID: str = ""
+
+    # ── Expose shared constant dicts ──────────────────────────────────────────
+    REPAIR_DATABASE: Dict[str, Any] = field(
+        default_factory=lambda: REPAIR_DATABASE)
+    SEVERITY_TO_ACTION: Dict[str, str] = field(
+        default_factory=lambda: SEVERITY_TO_ACTION)
+    PART_NAME_MAP: Dict[str, str] = field(
+        default_factory=lambda: PART_NAME_MAP)
+    ZONE_LANGUAGE_MAP: Dict[str, str] = field(
+        default_factory=lambda: ZONE_LANGUAGE_MAP)
+    COST_TABLE: Dict[tuple, tuple] = field(
+        default_factory=lambda: COST_TABLE)
+    DEFAULT_COST: tuple = field(
+        default_factory=lambda: DEFAULT_COST)
+
+    # ── Derived flags (computed from keys) ───────────────────────────────────
+    @property
+    def GEMINI_ENABLED(self) -> bool:
+        return bool(self.GEMINI_API_KEY)
+
+    @property
+    def GROQ_ENABLED(self) -> bool:
+        return bool(self.GROQ_API_KEY)
+
+    @property
+    def SERPAPI_ENABLED(self) -> bool:
+        return bool(self.SERPAPI_KEY)
+
+    @property
+    def WINSTON_AI_ENABLED(self) -> bool:
+        return bool(self.WINSTON_AI_KEY)
+
+    def summary(self) -> str:
+        """Print a human-readable startup summary."""
+        lines = [
+            "SmartForge Configuration",
+            f"  Gemini    : {'✅ ' + self.GEMINI_MODEL if self.GEMINI_ENABLED else '⚠️  disabled'}",
+            f"  Groq      : {'✅ ' + self.GROQ_MODEL if self.GROQ_ENABLED else '⚠️  disabled'}",
+            f"  MongoDB   : {'✅ configured' if self.MONGO_URI else '⚠️  SQLite fallback'}",
+            f"  SerpAPI   : {'✅ enabled' if self.SERPAPI_ENABLED else '—  disabled'}",
+            f"  Winston AI: {'✅ enabled' if self.WINSTON_AI_ENABLED else '—  disabled (ELA fallback)'}",
+            f"  Bypass    : {'BYPASS_FRAUD=True (demo mode)' if self.BYPASS_FRAUD else 'Full fraud layer active'}",
+        ]
+        return "\n".join(lines)
+
+
+# ── Module-level singleton (import-time) ──────────────────────────────────────
+# Use this in most places:  from src.config.settings import cfg
+cfg = Settings()
