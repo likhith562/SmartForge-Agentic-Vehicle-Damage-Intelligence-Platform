@@ -326,6 +326,7 @@ SmartForge was developed incrementally in 4 production-ready feature batches:
 - Perceptual hash (pHash) duplicate detection with local fraud DB
 - FFT Moiré pattern detection + ELA AI-generation forensics (Winston AI / Laplacian fallback)
 - `BYPASS_FRAUD` toggle for demo mode; dynamically switched `False` when insurance claim is filed
+- **3-Strike photo retry limit** — fraud-flagged uploads can be retried up to `MAX_FRAUD_RETRIES` (default 3) times; on the third failure the case is permanently closed with a `FRAUD_MAX_RETRIES_EXCEEDED` flag
 
 </details>
 
@@ -379,7 +380,13 @@ Tab 1 — 📥 Vehicle Intake
   • Vehicle ID (mandatory field, validated)
   • Owner name, vehicle type dropdown
   • Multi-image file upload (activates Batch 2 automatically)
-  • Incident date + GPS latitude/longitude
+  • Incident date + GPS coordinate capture via interactive Leaflet map:
+      - OpenStreetMap tile layer with full zoom controls
+      - City / address search bar — type any location and jump instantly
+      - Draggable pin — click anywhere on the map to drop or reposition it
+      - Live coordinate readout (lat/lon) shown below the map as you drag
+      - "Confirm Location" button writes lat/lon to the fraud layer fields
+      - Works exactly like Google Maps — no API key required
   • Saves session to MongoDB, navigates to Tab 2
 
 Tab 2 — 🔬 Damage Analysis
@@ -394,6 +401,12 @@ Tab 3 — 🛡️ Insurance Claim (conditional)
   • YES → insurance form reveals (policy number, claim reason, date)
   • YES → BYPASS_FRAUD=False → full 5-check fraud layer re-runs
   • Fraud badge shows trust score + active flags
+  • Photo re-upload with fraud retry limit:
+      - If the fraud layer flags an image, the user may re-upload a different photo
+      - Maximum 3 attempts enforced (MAX_FRAUD_RETRIES = 3)
+      - On the 3rd failed upload the claim is permanently closed and routed to
+        the Auditor Dashboard with a FRAUD_MAX_RETRIES_EXCEEDED flag
+      - Retry count and all attempt timestamps are persisted to the fraud_report
   • Case status: claim_submitted → fraud_checked → approved/rejected
 
 Tab 4 — 📊 Executive Summary
@@ -418,6 +431,8 @@ Tab 5 — 💬 AI Chat Assistant
 
 > Port `7861` · Audience: Insurance adjuster / compliance auditor  
 > Role: **AUDITOR** — no `vehicle_id` filter applied → full case visibility
+
+**Persistent AI Sidebar** — a collapsible Groq-powered chat panel is always visible on the right-hand side of every tab. Auditors can ask questions about any open case, query fraud patterns, or get plain-English explanations of pipeline decisions without leaving the current tab or interrupting their workflow. The sidebar maintains its own conversation history for the session and has access to the full case context of whichever record is currently loaded.
 
 ```
 Tab 1 — 🗂️ Case Explorer
@@ -723,6 +738,7 @@ AUTO_APPROVE_THRESHOLD=85
 ESCALATION_THRESHOLD=70
 TOTAL_LOSS_THRESHOLD=0.75
 VEHICLE_VALUE=15000
+MAX_FRAUD_RETRIES=3
 ```
 
 ### Key Thresholds
@@ -735,6 +751,7 @@ VEHICLE_VALUE=15000
 | `TOTAL_LOSS_THRESHOLD` | 0.75 | Repair > 75% vehicle value → TOTALED |
 | `MAX_RETRIES` | 2 | HealthMonitor retry limit before circuit break |
 | `SAHI_CONFIDENCE` | 0.3 | Base YOLO confidence (auto-raised for high-gloss vehicles) |
+| `MAX_FRAUD_RETRIES` | 3 | Max photo re-upload attempts before permanent case closure |
 
 ---
 
@@ -886,6 +903,6 @@ dnspython
 
 **Built with 🔬 by the SmartForge team**
 
-*SmartForge v31 · LangGraph DCG · SAHI + SAM + MiDaS · Gemini 2.5 Flash · Groq Llama-3.3-70b · 5-Check Fraud Layer · Golden Frame Verification · NetworkX Graph DB*
+*SmartForge v36 · LangGraph DCG · SAHI + SAM + MiDaS · Gemini 2.5 Flash · Groq Llama-3.3-70b · 5-Check Fraud Layer · 3-Strike Fraud Retry · Leaflet Incident Map · Auditor AI Sidebar · Golden Frame Verification · NetworkX Graph DB*
 
 </div>
