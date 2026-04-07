@@ -87,7 +87,7 @@ The pipeline follows two execution paths depending on fraud detection results:
 User Upload
     │
     ▼
-Intake Agent ──► Fraud Detection Layer (5-check) ──► Trust Score < 70 ──► Human Audit System
+Intake Agent ──► Fraud Detection Layer (5-check) ──► Trust Score < 40 ──► Human Audit System
                                                   │
                                                   |  Trust Score ≥ 70 (PASS)
                                                   |
@@ -145,7 +145,7 @@ The perception engine runs four stacked models in sequence:
 
 <br/>
 
-The fraud layer runs **5 independent checks** in parallel and aggregates into a Trust Score. A score below 70 routes to the Human Audit System; ≥ 70 passes to the perception pipeline.
+The fraud layer runs **5 independent checks** in parallel and aggregates into a Trust Score. A score below 40 routes to the Human Audit System; ≥ 40 passes to the perception pipeline.
 
 | Check | Method | Score Impact |
 |-------|--------|-------------|
@@ -157,8 +157,8 @@ The fraud layer runs **5 independent checks** in parallel and aggregates into a 
 
 ```
 Trust Score = base_100 + Σ(check_adjustments)
-Trust Score < 70  →  SUSPICIOUS_HIGH_RISK  →  Human Audit
-Trust Score ≥ 70  →  VERIFIED              →  Perception Pipeline
+Trust Score < 40  →  SUSPICIOUS_HIGH_RISK  →  Human Audit
+Trust Score ≥ 40  →  VERIFIED              →  Perception Pipeline
 ```
 
 > **Note:** `BYPASS_FRAUD = True` skips all checks for demo runs. When a user files an insurance claim in the UI, `BYPASS_FRAUD` is dynamically set to `False` and the full 5-check layer activates.
@@ -185,7 +185,7 @@ After CV detections pass the fraud gate, the agentic reasoning stack takes over:
 6. **Repair Recommendation Engine** — Repair/Replace decision via `SEVERITY_TO_ACTION` mapping
 7. **Cost Estimation Engine** — Mitchell/Audatex-style `REPAIR_DATABASE` with replace, paint, and labour costs (INR + USD)
 8. **Aggregation Engine** — combines all damages, computes overall health score (0–100)
-9. **Final Decision Logic** — Score ≥ 85 → Auto-Approved; 70–85 → Workshop; < 70 → Manual Review
+9. **Final Decision Logic** — All AI decisions route to one of three outcomes: `CLM_PENDING` (score ≥ 70, clean claim, awaiting auditor sign-off); `CLM_WORKSHOP` (score < 70 or High-severity damage, workshop inspection required); `CLM_MANUAL` (fraud flags or unconfirmed detections, immediate manual review). **The AI never auto-approves** — final `CLM_APPROVED` status can only be set by a human auditor via the Auditor Dashboard
 
 ---
 
@@ -305,7 +305,7 @@ intake ──► fraud ──┬──► map_images ──► cv_worker(×N) �
 
 | Source | Condition | Target |
 |--------|-----------|--------|
-| `fraud` | `trust_score < 70` | `human_audit → END` |
+| `fraud` | `trust_score < 40` | `human_audit → END` |
 | `fraud` | `len(image_paths) > 1` | `map_images` |
 | `fraud` | verified, single image | `perception` |
 | `health_monitor` | `validation_passed = True` | `verification_v2` |
@@ -324,8 +324,8 @@ SmartForge was developed incrementally in 4 production-ready feature batches:
 - GPS Haversine distance validation
 - EXIF software source integrity
 - Perceptual hash (pHash) duplicate detection with local fraud DB
-- FFT Moiré pattern detection + ELA AI-generation forensics (Winston AI / Laplacian fallback)
-- `BYPASS_FRAUD` toggle for demo mode; dynamically switched `False` when insurance claim is filed
+- FFT Moiré pattern detection + ELA AI-generation forensics (Winston AI → ELA → Laplacian 3-stage fallback)
+- `BYPASS_FRAUD` toggle for demo mode; dynamically switched `False` when user selects "Yes – I want to file a claim" in Tab 2 (Insurance Preference)
 - **3-Strike photo retry limit** — fraud-flagged uploads can be retried up to `MAX_FRAUD_RETRIES` (default 3) times; on the third failure the case is permanently closed with a `FRAUD_MAX_RETRIES_EXCEEDED` flag
 
 </details>
@@ -376,53 +376,94 @@ SmartForge ships two completely separate Gradio applications running on differen
 > Port `7860` · Audience: Vehicle owner / claimant
 
 ```
-Tab 1 — 📥 Vehicle Intake
-  • Vehicle ID (mandatory field, validated)
-  • Owner name, vehicle type dropdown
-  • Multi-image file upload (activates Batch 2 automatically)
-  • Incident date + GPS coordinate capture via interactive Leaflet map:
-      - OpenStreetMap tile layer with full zoom controls
-      - City / address search bar — type any location and jump instantly
-      - Draggable pin — click anywhere on the map to drop or reposition it
-      - Live coordinate readout (lat/lon) shown below the map as you drag
-      - "Confirm Location" button writes lat/lon to the fraud layer fields
-      - Works exactly like Google Maps — no API key required
-  • Saves session to MongoDB, navigates to Tab 2
+Tab 1 — 📥 1 · Vehicle Intake
+  • Vehicle ID (mandatory, validated — e.g. VH001 or TN-09-AB-1234)
+  • Owner / Claimant Name
+  • Vehicle Type dropdown: Auto-Detect (Gemini VLM) | Car/Sedan/SUV |
+    2-Wheeler | 3-Wheeler
+  • Incident Date — native HTML5 date picker (capped at today, auto-synced
+    to a hidden Gradio Textbox before submission)
+  • Incident Location — interactive Leaflet map (OpenStreetMap tiles):
+      - Address / city search bar with Nominatim autocomplete (300 ms debounce,
+        keyboard navigation ↑↓ Enter Esc, outside-click dismiss)
+      - 🌐 GPS button — calls browser geolocation API, centres map instantly
+      - Draggable pin — click anywhere or drag to reposition
+      - Live coordinate bar updates as you drag (lat, lon to 6 d.p.)
+      - "✅ Confirm Location" button writes lat/lon to the Gradio state
+        fields used by the fraud GPS consistency check
+  • Photo upload — drag & drop, multi-file (JPG/PNG); multiple images
+    activate Batch 2 Multi-Image Map-Reduce automatically
+  • "→ Save & Proceed to Insurance Preference" saves session to DB and
+    advances to Tab 2
+  • Intake Status textbox shows success/error summary
 
-Tab 2 — 🔬 Damage Analysis
-  • "Run Full Analysis" triggers complete LangGraph pipeline
-  • BYPASS_FRAUD=True (fraud gate runs separately in Tab 3)
-  • Shows: primary vehicle photo, detection records table
-    (✅ Confirmed / 🚩 Rejected / ❓ Pending), pipeline timeline
-  • Case status updated: uploaded → analyzed
+Tab 2 — 🛡️ 2 · Insurance Preference
+  • Determines whether fraud checks activate during Damage Analysis
+  • Info box explains the 3-attempt fraud retry limit upfront
+  • Radio: "Yes – I want to file a claim" | "No – damage assessment only"
+  • YES → reveals insurance claim form:
+      - Policy Number (mandatory)
+      - Accident Date (auto-filled from Tab 1 DB record)
+      - Claim Reason (mandatory)
+      - Additional Notes (optional — FIR number, witness info, etc.)
+      - Warning banner: fraud check will run during Damage Analysis,
+        up to 3 attempts before permanent case closure
+  • NO → assessment-only mode saved; fraud checks bypassed in Tab 3
+  • "✅ Save Preference & Proceed" writes preference to DB (status →
+    pref_saved) and advances to Tab 3
 
-Tab 3 — 🛡️ Insurance Claim (conditional)
-  • Radio: "Yes – file a claim" | "No – assessment only"
-  • YES → insurance form reveals (policy number, claim reason, date)
-  • YES → BYPASS_FRAUD=False → full 5-check fraud layer re-runs
-  • Fraud badge shows trust score + active flags
-  • Photo re-upload with fraud retry limit:
-      - If the fraud layer flags an image, the user may re-upload a different photo
+Tab 3 — 🔬 3 · Damage Analysis
+  • "🔍 Run Full Analysis" triggers the complete LangGraph pipeline:
+    SAHI → SAM → MiDaS → Gemini VLM → False Positive Gate →
+    Health Monitor → Golden Frame Verification → Reasoning → Decision → Report
+  • If insurance was set to Yes in Tab 2: BYPASS_FRAUD=False → full
+    5-check fraud layer runs; if No: BYPASS_FRAUD=True → fraud skipped
+  • Photo re-upload with fraud retry limit (when fraud is active):
+      - If fraud layer flags the image the user may re-upload
       - Maximum 3 attempts enforced (MAX_FRAUD_RETRIES = 3)
-      - On the 3rd failed upload the claim is permanently closed and routed to
-        the Auditor Dashboard with a FRAUD_MAX_RETRIES_EXCEEDED flag
-      - Retry count and all attempt timestamps are persisted to the fraud_report
-  • Case status: claim_submitted → fraud_checked → approved/rejected
+      - On the 3rd failure the case is permanently closed with a
+        FRAUD_MAX_RETRIES_EXCEEDED flag; all attempt timestamps persisted
+  • Pipeline Status textbox — scrolling log of each agent's progress
+  • Status Stepper (HTML) — visual progress indicator across stages
+  • Primary Vehicle Photo viewer (left column)
+  • ⚡ Pipeline Timeline (right column) — colour-coded node tiles showing
+    which agents ran (✓ badge = completed, grey = not reached)
+  • 🔎 Detection Records table — columns: ID | Type | Location | Severity |
+    Conf | Status (✅ Confirmed / 🚩 Rejected / ❓ Pending)
+  • Navigation hint: after analysis completes, directs user to Tab 4 for
+    the report; directs back to Tab 2 to file a claim if not yet filed
+  • Analysis auto-loads Executive Summary in Tab 4 after completion
 
-Tab 4 — 📊 Executive Summary
-  • Total Loss banner (red gradient) or Repairable banner (green)
-  • Colour-coded health score badge (green ≥80 / amber ≥60 / red <60)
-  • Groq-generated executive summary addressed to claimant
-  • Financial line-item table with grand total (USD + INR)
-  • Claim ruling badge: CLM_APPROVED | CLM_WORKSHOP | CLM_MANUAL | CLM_PENDING
-  • Fraud detection result + forensic integrity text
+Tab 4 — 📊 4 · Executive Summary
+  • "🔄 Refresh Report" button — manually re-loads report from DB
+  • Status Stepper and Pipeline Timeline (same as Tab 3, refreshed)
+  • Executive Summary textbox — Groq-generated plain-English claimant
+    narrative (2–3 sentences, non-technical)
+  • Health Score badge (right column) — colour-coded:
+    green ≥ 80 / amber ≥ 60 / red < 60
+  • Claim Ruling badge — one of:
+      CLM_PENDING   ⏳  AI assessment complete, awaiting auditor approval
+      CLM_WORKSHOP  🔧  Workshop inspection required (High severity / score < 70)
+      CLM_MANUAL    👁️  Manual forensic review required (fraud flags or unconfirmed detections)
+  • 💰 Line-Item Repair Estimate table — columns: Part | Action | Severity |
+    Cost (USD) | Cost (INR); grand total row at bottom
+  • 🛡️ Fraud Detection badge — trust score, status, active flags
+  • 🔬 Forensic Integrity textbox — Groq-generated legal-grade forensic
+    summary (ELA score, Laplacian variance, SerpAPI result, AI method)
 
-Tab 5 — 💬 AI Chat Assistant
+Tab 5 — 💬 5 · AI Assistant
   • gr.ChatInterface powered by Groq Llama-3.3-70b
-  • RAG-style: injects current session JSON as system context
-  • STRICT RULE: answers only about this vehicle/claim
+  • Scope: current session only — injects the user's full session JSON
+    as system context; cannot access other users' data
+  • Strict rule: answers only about this vehicle / claim
   • Chat history persisted to MongoDB after each turn
-  • Pre-loaded example questions
+  • Pre-loaded example questions:
+      "What damages were found on my vehicle?"
+      "What is my total repair cost in INR?"
+      "Should I file an insurance claim?"
+      "Explain the fraud detection result."
+      "How many fraud attempts have I used?"
+      "What is my vehicle health score?"
 ```
 
 ---
@@ -432,38 +473,69 @@ Tab 5 — 💬 AI Chat Assistant
 > Port `7861` · Audience: Insurance adjuster / compliance auditor  
 > Role: **AUDITOR** — no `vehicle_id` filter applied → full case visibility
 
-**Persistent AI Sidebar** — a collapsible Groq-powered chat panel is always visible on the right-hand side of every tab. Auditors can ask questions about any open case, query fraud patterns, or get plain-English explanations of pipeline decisions without leaving the current tab or interrupting their workflow. The sidebar maintains its own conversation history for the session and has access to the full case context of whichever record is currently loaded.
+**AI Auditor Sidebar** — a `gr.Sidebar` panel positioned on the right, **collapsed by default** and opened via toggle. Contains a full `gr.Chatbot` (Groq Llama-3.3-70b) that auto-injects live DB context on every message: the 15 most recent cases (vehicle ID, status, score, ruling, cost, fraud status, trust score, flag count, policy number), system-wide counts (total / analyzed / fraud / approved / rejected / pending), and the 5 most recent fraud-flagged cases with their active flag descriptions. Supports multi-turn conversation with a 6-turn rolling history window. Available from every tab without leaving the current view.
 
 ```
-Tab 1 — 🗂️ Case Explorer
-  • Search by vehicle_id (partial match), status, fraud-only toggle
-  • Live stats cards: Total / Analyzed / Fraud / Approved / Rejected / Pending
-  • Click any row → loads full detail panel:
-    - Case summary text, vehicle photo, auditor review history
-    - final_output JSON viewer (Code component)
+Tab 1 — 🗂️ 1 · Case Explorer
+  • Search controls: Vehicle ID (partial match), Status dropdown
+    (All | uploaded | analyzed | claim_submitted | fraud_checked |
+    approved | rejected), 🚨 Fraud Only checkbox, Search button
+  • Stats cards row: Total Cases | Analyzed | Fraud Flagged |
+    Approved | Rejected | Pending Review — auto-loads on page open
+    and refreshes whenever Tab 1 is selected
+  • Results table — 10 columns: Case ID | Vehicle ID | Status | Score |
+    Damages | Cost (USD) | Fraud Status | Trust | Ruling | Created
+  • Case Detail panel (click any row to load):
+      - Summary textbox (full case narrative, copyable)
+      - Vehicle Photo viewer
+      - Auditor Review textbox (prior decisions)
+      - final_output JSON viewer (Code component, truncated)
 
-Tab 2 — 📋 Insurance Claims
-  • All cases where filing_claim=True
-  • Columns: Policy No, Filed At, Claim Reason, Cost USD/INR, Ruling, Status, Fraud
+Tab 2 — 📋 2 · Insurance Claims
+  • Status filter dropdown (All | claim_submitted | approved | rejected)
+    + "🔄 Load Claims" button; filter also updates on dropdown change
+  • Claims table — 10 columns: Case ID | Vehicle | Policy No | Filed At |
+    Claim Reason | Cost (USD) | Cost (INR) | Ruling | Status | Fraud
+  • Click any row → auto-fills the Case ID field below
+  • ⚖️ Process a Claim panel:
+      - Case ID to Process textbox (auto-filled on row click)
+      - ✅ Approve Claim button → sets status = approved in DB
+      - ❌ Reject Claim button → sets status = rejected in DB
+      - Action Result textbox shows confirmation or error
 
-Tab 3 — 🚨 Fraud Review
-  • All is_fraud=True records
-  • Full forensic detail on row select:
-    - pHash Hamming distance, matched claim path
-    - ELA score, AI probability, method
-    - FFT Moiré signals, screen detection confidence
-  • Auditor Decision: Confirm Fraud | Clear – Not Fraud | Approve Claim | Reject Claim
-  • Decision + note written to auditor_review field, status updated in DB
+Tab 3 — 🚨 3 · Fraud Review
+  • "🔄 Load Fraud Cases" button — loads all is_fraud=True records
+  • Fraud table — 10 columns: Case ID | Vehicle | Trust Score |
+    Fraud Status | Flags | pHash Match | ELA Score | Screen Detect |
+    Auditor | Created
+  • Click any row → loads full forensic detail:
+      - Full Fraud Analysis textbox: trust score, all 5 check results,
+        pHash Hamming distance, matched claim path, ELA score, AI
+        probability, method, FFT Moiré signals, screen confidence
+  • ⚖️ Auditor Decision:
+      - Radio: Confirm Fraud | Clear — Not Fraud |
+                Approve Claim | Reject Claim
+      - Note textbox (optional, written to audit trail)
+      - "💾 Save Auditor Decision" → updates DB status + auditor_review
+        field, refreshes fraud table
 
-Tab 4 — 👤 User Management
-  • Per-vehicle aggregation: cases, claims filed, fraud flags, total cost, approved/rejected
-  • Click user row → full claim history table
+Tab 4 — 👤 4 · User Management
+  • "🔄 Load Users" button — aggregates all cases by vehicle_id
+  • Summary markdown (total users, cases, claims)
+  • Users table — 8 columns: Vehicle / User | Cases | Claims Filed |
+    Fraud Flags | Total Cost USD | Approved | Rejected | Last Activity
+  • Click any user row → loads that vehicle's full claim history:
+      - History table: Case ID | Status | Score | Ruling | Cost (USD) |
+        Fraud | Created
 
-Tab 5 — 📋 Audit Logs (Compliance Backbone)
-  • MemorySaver checkpoint dump rendered as formatted table:
-    Step | Node | Timestamp | Retries | Health Score | Detections | Messages
-  • Full agent_trace JSON (Code component)
-  • All agent decisions across all cases in sortable table
+Tab 5 — 📊 5 · Audit Logs
+  • Vehicle ID filter textbox (blank = latest 50 cases) + "🔄 Load Logs"
+  • 📌 MemorySaver Checkpoint Timeline — Textbox showing the checkpoint
+    dump of the most recent matching case (copyable, scrollable, 12 lines)
+  • 🧠 Agent Trace — Code component (JSON syntax highlighting) showing
+    the full pipeline_trace: reasoning, decision, and details per agent
+  • 🗂️ All Agent Decisions — Dataframe: 5 columns:
+    Case ID | Agent | Decision | Timestamp | Reasoning
 ```
 
 ---
@@ -557,8 +629,10 @@ db_find({})
 ### Status Pipeline
 
 ```
-uploaded → analyzed → claim_submitted → fraud_checked → approved / rejected
+uploaded → pref_saved → analyzed → claim_submitted → fraud_checked → approved / rejected
 ```
+
+> **Note:** `approved` and `rejected` are set exclusively by the human auditor via the Auditor Dashboard. The AI pipeline never sets `approved` directly — all AI-completed claims land in `claim_submitted` (→ `CLM_PENDING`), `pending_workshop_inspection` (→ `CLM_WORKSHOP`), or `manual_review_required` (→ `CLM_MANUAL`).
 
 ---
 
@@ -738,7 +812,6 @@ AUTO_APPROVE_THRESHOLD=85
 ESCALATION_THRESHOLD=70
 TOTAL_LOSS_THRESHOLD=0.75
 VEHICLE_VALUE=15000
-MAX_FRAUD_RETRIES=3
 ```
 
 ### Key Thresholds
@@ -746,8 +819,8 @@ MAX_FRAUD_RETRIES=3
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `FRAUD_TRUST_THRESHOLD` | 40 | Trust scores below this → `SUSPICIOUS_HIGH_RISK` |
-| `AUTO_APPROVE_THRESHOLD` | 85 | Health scores at or above → auto-approved |
-| `ESCALATION_THRESHOLD` | 70 | Health scores below → workshop inspection |
+| `AUTO_APPROVE_THRESHOLD` | 85 | Retained in config but AI never auto-approves — auditor approval is always required |
+| `ESCALATION_THRESHOLD` | 70 | Health scores below → `CLM_WORKSHOP` (workshop inspection required) |
 | `TOTAL_LOSS_THRESHOLD` | 0.75 | Repair > 75% vehicle value → TOTALED |
 | `MAX_RETRIES` | 2 | HealthMonitor retry limit before circuit break |
 | `SAHI_CONFIDENCE` | 0.3 | Base YOLO confidence (auto-raised for high-gloss vehicles) |
@@ -787,9 +860,12 @@ MAX_FRAUD_RETRIES=3
    Cell G1  → Dashboard config (MONGO_URI, theme, share toggle)
    Cell G2  → Database layer (MongoDB/SQLite auto-select)
    Cell G3  → User Dashboard (builds user_demo — does not launch yet)
+             Flow: Intake → Insurance Preference → Damage Analysis → Summary → AI Assistant
    Cell G4  → Auditor Dashboard + launches both apps
    ```
 6. Two public share links appear in Cell G4 output — one for users (port 7860), one for auditors (port 7861)
+
+> **User flow:** Tab 1 (Vehicle Intake) → Tab 2 (Insurance Preference) → Tab 3 (Damage Analysis) → Tab 4 (Executive Summary) → Tab 5 (AI Assistant)
 
 ### Option B — Local Launch
 
@@ -838,8 +914,8 @@ print(final["final_output"]["executive_summary"])
 | **Fraud — Reverse Search** | SerpAPI (optional) | Internet duplicate search |
 | **Graph DB** | NetworkX DiGraph | Multi-image detection fusion |
 | **Persistence** | MongoDB Atlas / SQLite | Case storage, chat history, audit logs |
-| **UI — User** | Gradio Blocks | 5-tab claimant dashboard (port 7860) |
-| **UI — Auditor** | Gradio Blocks | 5-tab admin dashboard (port 7861) |
+| **UI — User** | Gradio Blocks | 5-tab claimant dashboard (port 7860): Intake → Insurance Preference → Analysis → Summary → Chat |
+| **UI — Auditor** | Gradio Blocks + gr.Sidebar | 5-tab admin dashboard (port 7861) with collapsible AI sidebar (port 7861) |
 | **Env** | Google Colab T4 GPU | Primary compute runtime |
 
 ### Python Dependencies
@@ -903,6 +979,6 @@ dnspython
 
 **Built with 🔬 by the SmartForge team**
 
-*SmartForge v36 · LangGraph DCG · SAHI + SAM + MiDaS · Gemini 2.5 Flash · Groq Llama-3.3-70b · 5-Check Fraud Layer · 3-Strike Fraud Retry · Leaflet Incident Map · Auditor AI Sidebar · Golden Frame Verification · NetworkX Graph DB*
+*SmartForge v36 · LangGraph DCG · SAHI + SAM + MiDaS · Gemini 2.5 Flash · Groq Llama-3.3-70b · 5-Check Fraud Layer (threshold 40) · 3-Strike Fraud Retry · Leaflet Incident Map · AI Auditor Sidebar · Golden Frame Verification · NetworkX Graph DB · Human-Auditor-Only Approval*
 
 </div>
