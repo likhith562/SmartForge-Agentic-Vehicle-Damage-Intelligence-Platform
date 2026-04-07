@@ -673,10 +673,11 @@ smartforge-agentic-ai/
 │   └── fraud_hash_db.json               # Local pHash fraud database (seed entries)
 │
 ├── notebooks/
-│   ├── Vehicle_Damage_Agentic_AI_v31.ipynb  # Latest monolithic Colab notebook
-│   └── experiments/
-│       ├── yolo_training_experiments.ipynb
-│       └── sahi_confidence_tuning.ipynb
+│   ├── README.md
+│   ├── Vehicle_Damage_Agentic_AI_v36_gradio.ipynb  # Latest monolithic Colab notebook with gradio interface
+│   └── models/
+│       ├── detect-best.pt
+│       └── seg-best.pt
 │
 ├── src/
 │   ├── __init__.py
