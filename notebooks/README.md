@@ -1,324 +1,162 @@
-# 🚗 SmartForge — Agentic Vehicle Damage Intelligence Platform
+# 📓 SmartForge Notebook — Gradio Live Demo
 
-> **Autonomous Insurance Claims Processing · LangGraph + Gemini VLM + Groq**  
-> `Vehicle_Damage_Agentic_AI_v36_fixed.ipynb`
+> **Open this notebook in Google Colab to launch both interactive Gradio dashboards with public share links directly from your browser — no local setup required.**
 
----
-
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [API Keys & Secrets](#api-keys--secrets)
-- [Model Files](#model-files)
-- [Quick Start (Google Colab)](#quick-start-google-colab)
-- [Cell-by-Cell Guide](#cell-by-cell-guide)
-- [Configuration Reference](#configuration-reference)
-- [Dashboards](#dashboards)
-- [Database Setup](#database-setup)
-- [Troubleshooting](#troubleshooting)
+[![Open In Colab](https://img.shields.io/badge/Open%20In-Colab%20%7C%20Gradio%20Live%20Demo-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)](https://colab.research.google.com/github/your-username/smartforge-agentic-ai/blob/main/notebooks/Vehicle_Damage_Agentic_AI_v36_gradio.ipynb)
 
 ---
 
-## Overview
+## What the Notebook Launches
 
-SmartForge is a fully agentic, end-to-end insurance claims processing pipeline built on **LangGraph**. It accepts one or more vehicle damage photos and autonomously:
+Running all cells produces **two public Gradio share links** (valid for 1 week each):
 
-1. Detects and segments damage using a custom YOLO model + SAM
-2. Estimates depth deformation with MiDaS
-3. Runs a **5-check fraud detection** layer (EXIF temporal, GPS consistency, software integrity, perceptual hash, AI screen-detection)
-4. Enriches detections with **Gemini VLM** (vehicle type, part location, low-confidence verification)
-5. Verifies damage with **Golden Frame forensic crops** sent back to Gemini at full resolution
-6. Classifies severity, generates line-item cost estimates, and issues an insurance ruling
-7. Produces AI-written damage narratives via **Groq**
-8. Surfaces results in **two Gradio dashboards** — a claimant-facing portal and a full auditor/admin console
+| App | Port | URL format | Audience |
+|-----|------|-----------|----------|
+| **User Dashboard** | 7860 | `https://xxxxxxxx.gradio.live` | Vehicle owner / claimant |
+| **Auditor Dashboard** | 7861 | `https://yyyyyyyy.gradio.live` | Insurance adjuster / auditor |
 
----
-
-## Architecture
-
-```
-intake ──► fraud ──┬──► map_images ──► cv_worker(×N) ──► fusion   ──►┐
-(single-image)     │   (multi-image Send fan-out)                    │
-                   │                                                 ▼
-                   └──────────────────────────────────────► perception
-                                                                     │
-                                                              gemini_agent
-                                                                     │
-                                                        false_positive_gate
-                                                                     │
-                                                           health_monitor
-                                                           ┌─────────┘
-                                                    (retry?│circuit breaker)
-                                                           ▼
-                                                  verification_v2_node  ←  Golden Frame
-                                                           │
-                                                     reasoning_node     ← cost estimation
-                                                           │
-                                                    [INTERRUPT]
-                                                     decision_node      ← claims ruling
-                                                           │
-                                                      report_node       ← Groq narratives
-                                                           │
-                                                          END
-```
-
-**Key design patterns:**
-| Pattern | Where used |
-|---|---|
-| LangGraph cyclic graph with circuit breaker | `health_monitor` → `perception_retry` loop |
-| LangGraph `Send` API for parallel fan-out | `map_images_node` — one worker per uploaded photo |
-| Human-in-the-Loop interrupt | `interrupt_before=["decision"]` on high-value claims |
-| NetworkX in-memory graph DB | `fusion_node` — cross-image damage deduplication |
-| MemorySaver checkpointing | Full state dump at every super-step |
+Both links appear at the bottom of Cell G4. Share the respective links with users and auditors — no authentication is required in the demo setup.
 
 ---
 
 ## Prerequisites
 
-| Requirement | Details |
-|---|---|
-| **Runtime** | Google Colab with **GPU** (T4 or better). `Runtime → Change runtime type → T4 GPU` |
-| **Python** | 3.10+ (Colab default) |
-| **Disk space** | ~3 GB for model weights + dependencies |
-| **API access** | Gemini API, Groq API (see below) |
+| Requirement | Notes |
+|-------------|-------|
+| Google account | To access Colab |
+| T4 GPU runtime | Runtime → Change runtime type → T4 GPU |
+| `GEMINI_API_KEY` | Free at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
+| `GROQ_API_KEY` | Free at [console.groq.com/keys](https://console.groq.com/keys) |
+| `SMARTFORGE_MONGO_URI` | Optional — SQLite fallback activates automatically if omitted |
 
 ---
 
-## API Keys & Secrets
+## Cell-by-Cell Walkthrough
 
-SmartForge uses **Google Colab Secrets** to avoid hardcoding credentials. All keys are read at runtime via `google.colab.userdata`.
+### Setup Cells
 
-### Required Keys
+| Cell | Name | What it does | Run once? |
+|------|------|-------------|-----------|
+| **Cell 0** | Drive Mount | Mounts Google Drive for model/log persistence | Optional |
+| **Cell 1** | Configuration | Sets all paths and thresholds — **edit this cell** | Every session |
+| **Cell 2** | Install Dependencies | Installs langgraph, ultralytics, sahi, gemini, groq, gradio (~3–5 min) | Once per session |
+| **Cell 3** | Imports | Imports all libraries, confirms GPU availability | Every session |
 
-| Secret Name | Where to get it | Used for |
-|---|---|---|
-| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com/app/apikey) | Gemini VLM — vehicle classification, damage verification, Golden Frame forensics |
-| `GROQ_API_KEY` | [console.groq.com](https://console.groq.com/keys) | Groq — fast AI-generated damage narrative text |
+> **Cell 1 is the only cell you need to edit.** All other cells run as-is.
 
-### Optional Keys
+### Pipeline Cells
 
-| Secret Name | Purpose | Fallback behaviour |
-|---|---|---|
-| `SERPAPI_KEY` | Reverse image search in fraud layer | Fraud check skipped silently |
-| `WINSTON_AI_KEY` | AI-generated image detection (fraud layer) | Check skipped silently |
-| `SMARTFORGE_MONGO_URI` | MongoDB Atlas connection string | Auto-falls back to local SQLite |
+| Cell | Name | What it does |
+|------|------|-------------|
+| **Cell 4** | State Schema | Defines `SmartForgeState` TypedDict — the shared state for all agents |
+| **Cell 5** | Pipeline Helpers | Cost tables, severity mapping, location helpers |
+| **Cell 6** | `intake_node` | Image validation, adaptive SAHI confidence, specular highlight detection |
+| **Cell 6b** | `fraud_node` | 5-check fraud layer (EXIF + GPS + pHash + ELA + FFT Moiré) |
+| **Cell 6c** | Batch 2 Map-Reduce | `map_images_node`, `cv_worker_node`, `fusion_node` + NetworkX graph |
+| **Cell 6d** | Batch 3 Verification | `verification_v2_node` — Golden Frame high-res crop + Gemini Deep Look |
+| **Cell 7** | `perception_node` | Full SAHI → SAM → MiDaS → part detection pipeline |
+| **Cell 7b** | `gemini_agent_node` | Vehicle type, location enrichment, low-conf verification, missed-damage scan |
+| **Cell 7c** | `false_positive_gate_node` | 4-gate domain-shift correction for non-car vehicles |
+| **Cell 8** | `health_monitor_node` | Validation checks + conditional retry routing |
+| **Cell 9** | `perception_retry_node` | Circuit-breaker retry wrapper |
+| **Cell 10** | `reasoning_node` | Severity classification + Batch 4 financial estimation |
+| **Cell 11** | `decision_node` | Claim ruling (CLM_PENDING / CLM_WORKSHOP / CLM_MANUAL) + HITL interrupt |
+| **Cell 12** | `report_node` | Three-section Groq narrative (executive summary + forensic + line-item estimate) |
+| **Cell 13** | Build Graph | Assembles LangGraph DCG with MemorySaver checkpointer |
+
+### Dashboard Cells
+
+| Cell | Name | What it does |
+|------|------|-------------|
+| **Cell G1** | Dashboard Config | Set theme, MongoDB URI, share toggle |
+| **Cell G2** | Database Layer | MongoDB Atlas connection + SQLite fallback; defines `db_upsert`, `db_get`, `db_find`, `db_count` |
+| **Cell G3** | User Dashboard | Builds `user_demo` Gradio app (5 tabs) — does NOT launch yet |
+| **Cell G4** | Auditor Dashboard + Launch | Builds `auditor_demo` + launches both apps → **two public share links appear here** |
 
 ---
 
-### How to Add Secrets in Google Colab
+## User Dashboard Flow (5 Tabs)
 
-> **Colab Secrets** are the correct way to store credentials — never paste API keys directly into notebook cells.
+```
+Tab 1 — Vehicle Intake
+  Enter vehicle ID, owner name, upload damage photos, pick incident
+  date and location on the Leaflet map, then press "Save & Proceed".
 
-1. Open your notebook in Google Colab
-2. Click the **🔑 Key icon** in the left sidebar (or go to `Tools → Secrets`)
-3. Click **+ Add new secret**
-4. Enter the **Name** exactly as shown in the table above (e.g. `GEMINI_API_KEY`)
-5. Paste the key value into the **Value** field
-6. Toggle **Notebook access** to **ON** for each secret
-7. Repeat for each key
+Tab 2 — Insurance Preference
+  Choose "Yes – I want to file a claim" (activates fraud checks) or
+  "No – damage assessment only" (bypasses fraud checks).
+  Fill in policy number and claim reason if filing.
 
-The notebook reads them automatically:
+Tab 3 — Damage Analysis
+  Press "Run Full Analysis" to execute the complete LangGraph pipeline.
+  Watch the agent timeline update in real time.
+  Detection table shows every damage with confirmed/rejected status.
 
-```python
-from google.colab import userdata
-GEMINI_API_KEY = userdata.get("GEMINI_API_KEY")
-GROQ_API_KEY   = userdata.get("GROQ_API_KEY")
+Tab 4 — Executive Summary
+  Health score badge, claim ruling (CLM_PENDING / CLM_WORKSHOP / CLM_MANUAL),
+  line-item repair estimate in USD and INR, fraud badge, forensic integrity report.
+
+Tab 5 — AI Assistant
+  Chat with Groq Llama-3.3-70b scoped to your current session only.
+  Ask about damages, costs, fraud results, claim status.
 ```
 
-> ⚠️ Secrets are **per-account and per-notebook**. If you share a copy of the notebook, the recipient must add their own secrets.
+---
+
+## Auditor Dashboard Flow (5 Tabs)
+
+```
+Tab 1 — Case Explorer      Search all cases, click row for full detail + JSON
+Tab 2 — Insurance Claims   Filter by status, approve or reject claims directly
+Tab 3 — Fraud Review       Forensic detail per flagged case, auditor decision
+Tab 4 — User Management    Per-vehicle history, claim frequency stats
+Tab 5 — Audit Logs         MemorySaver checkpoint timeline + agent trace JSON
+```
+
+An **AI Auditor sidebar** (Groq-powered, collapsible on the right) is available from every tab — ask it about system stats, recent fraud flags, or specific cases.
 
 ---
 
 ## Model Files
 
-| File | Source | What it does |
-|---|---|---|
-| `seg-best.pt` | ✅ Included in repo — `models/seg-best.pt` | Custom YOLO damage segmentation model |
-| `detect-best.pt` | ✅ Included in repo — `models/detect-best.pt` | Custom YOLO vehicle part detection model |
-| `sam_vit_b_01ec64.pth` | ⬇️ Auto-downloaded from Meta at runtime | Meta's Segment Anything Model (SAM ViT-B) |
+The two custom YOLO weights ship inside `notebooks/models/`:
 
-### How models are loaded
-
-**`seg-best.pt` and `detect-best.pt`** ship with this repository inside the `models/` folder. When you clone the repo and open the notebook in Colab, copy them to `/content/` with:
-
-```python
-# Run this once after cloning — or add it as a Colab cell
-!cp models/seg-best.pt     /content/seg-best.pt
-!cp models/detect-best.pt  /content/detect-best.pt
+```
+notebooks/models/
+├── seg-best.pt       ← damage segmentation model (YOLO custom)
+└── detect-best.pt    ← part detection model (YOLO custom)
 ```
 
-Or if you mounted Google Drive and cloned there:
+Copy them to `/content/` before running Cell 1:
 
 ```python
-import shutil
-shutil.copy("/content/drive/MyDrive/smartforge/models/seg-best.pt",    "/content/seg-best.pt")
-shutil.copy("/content/drive/MyDrive/smartforge/models/detect-best.pt", "/content/detect-best.pt")
+# Run this once in a Colab cell before Cell 1
+!cp /content/drive/MyDrive/smartforge/seg-best.pt    /content/seg-best.pt
+!cp /content/drive/MyDrive/smartforge/detect-best.pt /content/detect-best.pt
+# Or if models are uploaded directly to Colab Files panel, they are already at /content/
 ```
 
-**`sam_vit_b_01ec64.pth`** is **not** stored in the repo (it is 375 MB). The notebook downloads it automatically from Meta's servers on first run:
-
-```python
-SAM_URL = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-```
-
-No action needed — if the file is missing from `/content/`, the pipeline fetches it before the CV stack starts. Subsequent runs in the same Colab session reuse the cached file.
+The SAM checkpoint (`sam_vit_b_01ec64.pth`, ~375 MB) is **downloaded automatically** from Meta's servers during Cell 7 on first run — no action required.
 
 ---
 
-## Quick Start (Google Colab)
+## Tips for a Smooth Demo
 
-```
-1.  Clone the repo into your Google Drive (or open directly in Colab via GitHub)
-2.  Runtime → Change runtime type → T4 GPU
-3.  Add Colab Secrets:  GEMINI_API_KEY  and  GROQ_API_KEY
-4.  Copy model weights:  !cp models/seg-best.pt /content/  &&  !cp models/detect-best.pt /content/
-5.  Runtime → Run all
-        ↳ SAM weights (~375 MB) are downloaded automatically — no action needed
-6.  Wait for Cell G4 to print public share URLs (≈ 5–8 minutes first run)
-7.  Open the User Dashboard URL in any browser
-```
-
-On subsequent runs within the same Colab session, skip steps 1–3 and go straight to `Runtime → Run all`.
-
----
-
-## Cell-by-Cell Guide
-
-| Cell | Name | What it does | Must edit? |
-|---|---|---|---|
-| **Cell 0** | Drive Mount | Mounts Google Drive (optional) | No |
-| **Cell 1** | Configuration | All runtime parameters — model paths, thresholds, API keys | ✏️ **Yes** (model paths) |
-| **Cell 2** | Install Dependencies | `pip install` for all packages — run once per session | No |
-| **Cell 3** | Imports & Env Check | Validates GPU, imports libraries | No |
-| **Cell 4** | State Schema | LangGraph `TypedDict` state definition | No |
-| **Cell 5** | Helpers & Cost Engine | Part name maps, repair database, cost estimation | No |
-| **Cell 6** | `intake` node | Image validation, resolution correction, condition analysis | No |
-| **Cell 6b** | `fraud` node | 5-check fraud & integrity layer | No |
-| **Cell 6c** | `map_images` / `fusion` | Batch 2 multi-image parallel fan-out + NetworkX graph DB | No |
-| **Cell 6d** | `verification_v2` | Batch 3 Golden Frame: crops damage bbox → Gemini forensic analysis | No |
-| **Cell 7** | `perception` node | SAHI → SAM → MiDaS → Part Detection | No |
-| **Cell 7b** | `gemini_agent` | Gemini VLM enrichment (vehicle type, part location, verification) | No |
-| **Cell 7c** | `false_positive_gate` | 4-layer false-positive filter for non-car vehicles | No |
-| **Cell 8** | `health_monitor` | Validates perception output; routes retry or reasoning | No |
-| **Cell 9** | `perception_retry` | Circuit-breaker retry wrapper | No |
-| **Cell 10** | `reasoning` node | Severity classification + cost estimation | No |
-| **Cell 11** | `decision` node | Insurance ruling (CLM_AUTO_APPROVE / CLM_MANUAL / CLM_REJECT) | No |
-| **Cell 12** | `report` node | Groq-generated AI damage narrative | No |
-| **Cell 13** | Build LangGraph | Assembles graph with all nodes, edges, checkpointer | No |
-| **Cell G1** | Dashboard Config | Gradio title, theme, share toggle, MongoDB URI | ✏️ Optional |
-| **Cell G2** | Database Layer | MongoDB Atlas / SQLite auto-fallback setup | No |
-| **Cell G3** | User Dashboard | Builds 5-tab claimant UI (does not launch) | No |
-| **Cell G4** | Auditor Dashboard + Launch | Builds auditor UI and **launches both apps** | No |
-
----
-
-## Configuration Reference
-
-All user-editable settings live in **Cell 1**. Edit only this cell.
-
-```python
-# ── Model paths ────────────────────────────────────────────────────────────────
-DAMAGE_MODEL_PATH        = "/content/seg-best.pt"        # YOLO damage segmentation
-PART_MODEL_PATH          = "/content/detect-best.pt"     # YOLO part detection
-SAM_CHECKPOINT           = "/content/sam_vit_b_01ec64.pth"
-SAM_URL                  = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-
-# ── SAHI inference settings ────────────────────────────────────────────────────
-SAHI_CONFIDENCE          = 0.3    # Base detection confidence (auto-adjusted per image)
-SAHI_SLICE_SIZE          = 640    # Tile size for sliced inference
-SAHI_OVERLAP             = 0.2    # Tile overlap ratio
-
-# ── Claim metadata (set per job or leave blank) ────────────────────────────────
-VEHICLE_ID               = ""
-IMAGE_ID                 = ""
-POLICY_ID                = ""
-
-# ── Agentic thresholds ─────────────────────────────────────────────────────────
-MAX_RETRIES              = 2      # Max perception retries before circuit-breaker fires
-ESCALATION_THRESHOLD     = 70     # Vehicle health score below this → escalate
-CONFIDENCE_RECHECK_LIMIT = 0.45   # YOLO confidence below this → Gemini re-verification
-AUTO_APPROVE_THRESHOLD   = 85     # Health score above this → auto-approve claim
-
-# ── Gemini & Groq models ───────────────────────────────────────────────────────
-GEMINI_MODEL             = "gemini-2.5-flash"
-GEMINI_MODEL_FALLBACK    = "gemini-2.0-flash"
-GROQ_MODEL               = "llama-3.3-70b-versatile"
-```
-
----
-
-## Dashboards
-
-After Cell G4 runs, two public Gradio URLs are printed. Share these links for demos.
-
-### User Dashboard (Port 7860)
-
-| Tab | Purpose |
-|---|---|
-| 📥 Vehicle Intake | Enter Vehicle ID, Policy ID, upload photos |
-| 🔬 Damage Analysis | Trigger full AI pipeline; see annotated damage maps |
-| 🛡️ Insurance Claim | File claim; activates 5-check fraud layer |
-| 📊 Executive Summary | Vehicle health score, cost estimate, claims ruling, fraud badge |
-| 💬 AI Assistant | Groq-powered chat scoped to the current session |
-
-### Auditor Dashboard (Port 7861)
-
-| Tab | Purpose |
-|---|---|
-| 🗂️ Case Explorer | Search all cases by ID, status, date, fraud flag |
-| 📋 Insurance Claims | All filed claims with cost breakdowns |
-| 🚨 Fraud Review | Suspicious cases — mark as fraud, clear, or approve |
-| 👤 User Management | Per-vehicle claim history and statistics |
-| 📋 Audit Logs | Full agent trace, MemorySaver checkpoint dumps, pipeline timeline |
-
-> **Share toggle:** Set `GRADIO_SHARE = True` in Cell G1 (default) to generate public ngrok links valid for 72 hours. Set to `False` for local-only access.
-
----
-
-## Database Setup
-
-SmartForge automatically selects a database backend:
-
-### Option A — MongoDB Atlas (Recommended for Production)
-
-1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas)
-2. Get your connection string: `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/`
-3. Add it as a Colab Secret named `SMARTFORGE_MONGO_URI`, **or** paste it into Cell G1:
-
-```python
-MONGO_URI = "mongodb+srv://user:password@cluster.mongodb.net/"
-```
-
-### Option B — SQLite (Zero-config Fallback)
-
-Leave `MONGO_URI = ""` in Cell G1. SmartForge automatically creates a local SQLite file at `/content/smartforge.db`. All dashboard functions work identically — data is lost when the Colab session ends.
+- **BYPASS_FRAUD = True** in Cell 1 skips all fraud checks for quick demos without EXIF metadata. Set to `False` for production.
+- If you get a **429 rate limit** from Gemini, the system automatically falls back to `gemini-2.5-flash-lite`.
+- MongoDB URI is optional — if omitted, all data is stored in `/content/smartforge_claims.db` (SQLite). The data resets when the Colab session ends.
+- Both Gradio share links expire after **1 week**. Re-run Cell G4 to get fresh links.
+- Use **Cell 16** (if present) to trigger the deliberate unhappy-path demo — shows the HealthMonitor self-correction loop in action.
 
 ---
 
 ## Troubleshooting
 
 | Symptom | Fix |
-|---|---|
-| `No GPU detected` warning | `Runtime → Change runtime type → T4 GPU`, then `Runtime → Restart and run all` |
-| `FileNotFoundError: seg-best.pt` | Run `!cp models/seg-best.pt /content/ && !cp models/detect-best.pt /content/` — the files are in the `models/` folder of this repo |
-| `KeyError: GEMINI_API_KEY` | Add the secret in Colab Secrets (🔑 icon) and enable Notebook access |
-| `429 quota exhausted` on Gemini | Pipeline auto-falls back to `gemini-2.0-flash`; add billing to your Google AI project for higher quota |
-| Gradio share link not generated | `GRADIO_SHARE = True` must be set in Cell G1; Colab must have internet access |
-| `ModuleNotFoundError` on any package | Re-run Cell 2 (dependency install); some packages need a kernel restart after first install |
-| Claim always routes to `CLM_MANUAL` | All unconfirmed or rejected detections force manual review — this is expected behaviour for non-car vehicles or low-confidence images |
-| MongoDB connection timeout | Whitelist `0.0.0.0/0` in your Atlas Network Access settings, or switch to SQLite fallback |
-
----
-
-## Notes for Contributors
-
-- **Cell 1 is the only user-editable cell** in the pipeline section. All other pipeline cells (0–13) are functional and should not be modified unless you are extending the architecture.
-- The LangGraph state (`SmartForgeState`) is the **single source of truth** — all node outputs are returned as partial state dicts and merged by the graph engine.
-- Fraud checks degrade gracefully — missing API keys cause individual checks to be skipped without breaking the pipeline.
-- `GRADIO_DEBUG = True` in Cell G1 shows full tracebacks in the browser for development.
-
----
-
-*SmartForge v36 · LangGraph + Gemini 2.5 Flash + Groq LLaMA 3.3 70B · Google Colab (T4 GPU)*
+|---------|-----|
+| `CUDA out of memory` | Restart runtime, re-run from Cell 2 |
+| `ModuleNotFoundError: sahi` | Re-run Cell 2 (install cell) |
+| `SecretNotFoundError: Gemini_API_Key` | Add secret via 🔑 sidebar, toggle Notebook access ON |
+| Gradio link expired | Re-run Cell G4 |
+| `seg-best.pt not found` | Copy model to `/content/` as shown above |
+| MongoDB connection timeout | Leave `SMARTFORGE_MONGO_URI` empty — SQLite fallback activates |
