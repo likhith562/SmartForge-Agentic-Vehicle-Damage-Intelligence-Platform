@@ -1027,7 +1027,7 @@ smartforge-agentic-ai/
 │       ├── user_tab3_analysis.png
 │       ├── user_tab4_summary.png
 │       ├── user_tab5_chat.png
-│       ├── auditor_tab1_cases.png
+│       ├── aauditor_tab1_cases_with_sidebar_Chatbot.png
 │       ├── auditor_tab2_claims.png
 │       ├── auditor_tab3_fraud.png
 │       ├── auditor_tab4_users.png
