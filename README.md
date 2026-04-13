@@ -9,7 +9,7 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com)
 [![Gradio](https://img.shields.io/badge/Gradio-5%20Tab%20Dashboard-FF7C00?style=for-the-badge&logo=gradio&logoColor=white)](https://gradio.app)
 [![Open In Colab](https://img.shields.io/badge/Open%20Notebook%20%7C%20Gradio%20Live%20Demo-Colab-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)](https://colab.research.google.com/github/your-username/smartforge-agentic-ai/blob/main/notebooks/Vehicle_Damage_Agentic_AI_v36_gradio.ipynb)
-
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
 <br/>
 
 **An end-to-end autonomous insurance claims processing system** powered by a LangGraph Directed Cyclic Graph orchestrating 13 specialized AI agents — from YOLO/SAM/MiDaS computer vision through Gemini multimodal verification, a 5-check forensic fraud layer, and Groq-generated structured reports — with dual Gradio dashboards and MongoDB persistence.
@@ -45,6 +45,7 @@
 - [Tech Stack](#tech-stack)
 - [Roadmap](#roadmap)
 - [Acknowledgements](#acknowledgements)
+- [License](#license)
 
 ---
 
@@ -1009,6 +1010,7 @@ smartforge-agentic-ai/
 │
 ├── .env.example                    # API key template (GROQ, GEMINI, MONGO_URI, all thresholds)
 ├── .gitignore                      # Excludes __pycache__, .env, uploaded images, *.pt models
+├── LICENSE
 ├── README.md                       # This file
 ├── requirements.txt                # All Python dependencies with pinned versions
 ├── main.py                         # Entry point — launches both Gradio apps simultaneously
@@ -1518,5 +1520,11 @@ print(json.dumps(checkpoint.values["pipeline_trace"], indent=2, default=str))
 **Built with 🔬 by the SmartForge team**
 
 *SmartForge v36 · LangGraph DCG · SAHI + SAM + MiDaS · Gemini 2.5 Flash · Groq Llama-3.3-70b · 5-Check Fraud Layer (threshold 40) · 3-Strike Fraud Retry · Leaflet Incident Map · AI Auditor Sidebar · Golden Frame Verification · NetworkX Graph DB · Human-Auditor-Only Approval*
+---
 
+## License
+
+Distributed under the Apache 2.0 License. See `LICENSE` for more information.
+
+Copyright (c) 2026 Dasari Likhith
 </div>
